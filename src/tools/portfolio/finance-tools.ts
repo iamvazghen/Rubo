@@ -60,7 +60,7 @@ export const rebalanceProposal = new DynamicStructuredTool({
 
 export const rebalanceTargets = new DynamicStructuredTool({
   name: 'rebalance_targets',
-  description: 'Show or set target weights, e.g. "set stock 50 etf 40 cash 10", "mode holding", "band 5". Setting is a durable change: confirm first.',
+  description: 'Show or set rebalancing targets: "set stock 50 etf 40 cash 10", "mode holding|asset_type|region|sector", "tag VT region world", "band 5", "min 100", "fee 1 0.1" (fixed + % per trade). Setting is a durable change: confirm first.',
   schema: z.object({ command: z.string().describe('Empty to show, or e.g. "set stock 50 etf 40 cash 10".') }),
   func: ({ command }) => run('targets', command),
 });

@@ -182,7 +182,10 @@ async function done(args: string, market: MarketData): Promise<string> {
         const avgCost = (pos.shares * pos.avg_cost + a.units * localPrice) / shares;
         portfolio.update((p) => ({
           ...p,
-          positions: p.positions.map((x) => (x.ticker === event.ticker ? { ...x, shares, avg_cost: Math.round(avgCost * 10_000) / 10_000 } : x)),
+          positions: p.positions.map((x) => (x.ticker === event.ticker ? {
+            ...x, shares, avg_cost: Math.round(avgCost * 10_000) / 10_000,
+            ...(x.lots ? { lots: [...x.lots, { date: new Date().toISOString().slice(0, 10), shares: a.units!, price: Math.round(localPrice * 10_000) / 10_000 }] } : {}),
+          } : x)),
         }));
         notes.push(`added ${formatShares(a.units)} ${event.ticker} to your holding (now ${formatShares(shares)})`);
       } else {

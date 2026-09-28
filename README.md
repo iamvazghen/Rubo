@@ -340,7 +340,7 @@ Sample exports with made-up holdings are in [`examples/`](examples/): an IBKR Ac
 | `/done <id>` | Record a payment as handled: reserve, allowance used and reinvested shares are updated |
 | `/reserve` | Balance of the down-market cash reserve |
 | `/tax` | Tax residence, filing, jurisdiction options, per-account W-8BEN / domestic broker / allowance assigned, allowance left |
-| `/targets`, `/rebalance [cash N]` | Target weights and the tax-aware trades that bring holdings back into band |
+| `/targets`, `/rebalance [cash N]` | Target weights (per holding, asset type, region or sector), band, minimum trade and fees; the tax-aware trades that bring holdings back into band, with the weights before and after |
 
 How it works:
 
@@ -353,7 +353,7 @@ How it works:
 
   A domestic broker that withholds takes the tax at payment; otherwise it is due with your return and is set aside before your plan is applied. To add a country, add an entry to `jurisdictions.ts` with a test.
 - **Reminders.** A nightly job (06:30 your time, on the gateway) refreshes the calendar and schedules two Telegram messages per payment: before the ex-date, and on the pay date with your plan already worked out. The numbers are computed and sent verbatim, never generated.
-- **Rebalancing.** New cash and the reinvested part of income due in 30 days go to underweights first; only then are overweights sold, with the tax on the gain estimated. A quarterly job alerts only when something leaves its band. Rubo never places trades.
+- **Rebalancing.** New cash and the reinvested part of income due in 30 days go to underweights first; only then are overweights sold, with the tax on the gain and the broker's fees estimated (`/targets fee 1 0.1`: a fixed amount plus a percentage per trade; fees also reduce the taxable gain). Sales are taxed on the oldest purchases first (FIFO), as German brokers must, whenever the holding came from a transaction export that lists them; otherwise on the average cost, and the reply says which. Targets can be per holding, asset type, region or sector: regions and sectors of companies come from Yahoo's company profile, funds are tagged by you (`/targets tag VT region world`). A quarterly job alerts only when something leaves its band. Rubo never places trades.
 - **Jev** (optional). Probabilities for questions that are judgement, not arithmetic: will this dividend be cut, does the thesis still hold, does this news matter. See [Jev judgement layer](#jev-judgement-layer).
 
 The gateway sends the reminders, so the server must know your holdings: import through Telegram, or import in the CLI (synced automatically with `RUBO_VPS` set, otherwise run `rubo push`). The launcher finds its checkout from its own location (or `RUBO_REPO`); `pull`, `push`, `vps` and `logs` need `RUBO_VPS=user@host`, and `RUBO_VPS_HOME` / `RUBO_VPS_UNIT` if your server does not use `~/.rubo` and `rubo-gateway`.

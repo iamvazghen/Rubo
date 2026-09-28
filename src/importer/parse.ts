@@ -12,6 +12,27 @@ export interface ImportedHolding {
   avg_cost: number;
   currency: string;
   asset_type?: 'stock' | 'etf' | 'bond';
+  /** Purchases still held, oldest first (transaction exports only). */
+  lots?: Lot[];
+}
+
+/** One purchase still (partly) held: date, shares left, price in the holding's currency. */
+export interface Lot {
+  date: string;
+  shares: number;
+  price: number;
+}
+
+/** "15.04.2026", "2026-04-15", "04/15/2026" (US order) → "2026-04-15". */
+export function parseDate(raw: string | undefined): string | undefined {
+  const s = (raw ?? '').trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(s);
+  if (m) return `${m[3]}-${m[2]!.padStart(2, '0')}-${m[1]!.padStart(2, '0')}`;
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+  if (m) return `${m[3]}-${m[1]!.padStart(2, '0')}-${m[2]!.padStart(2, '0')}`;
+  return undefined;
 }
 
 export interface ParseResult {
@@ -75,6 +96,7 @@ const COLUMNS: Record<string, string[]> = {
   currency: ['currency', 'currencyprimary', 'wahrung', 'waehrung', 'ccy'],
   type: ['assetclass', 'assetcategory', 'type', 'art', 'wertpapierart', 'typ', 'transactiontype', 'transaktion'],
   amount: ['amount', 'betrag', 'value', 'wert'],
+  date: ['date', 'datum', 'tradedate', 'transactiondate', 'buchungstag', 'valuta', 'valutadatum', 'handelstag', 'ausfuhrungsdatum'],
 };
 
 function findColumns(header: string[]): Record<string, number> {
@@ -153,12 +175,17 @@ export function parseGenericTable(rows: string[][], format: string): ParseResult
   });
   if (headerIdx < 0) return null;
   const c = findColumns(rows[headerIdx]!);
-  const data = rows.slice(headerIdx + 1);
+  let data = rows.slice(headerIdx + 1);
   const warnings: string[] = [];
   const typeValues = c.type != null ? data.map((r) => r[c.type!] ?? '') : [];
   const isTransactions = typeValues.some((t) => BUY.test(t) || SELL.test(t));
+  const dateOf = (r: string[]) => (c.date != null ? parseDate(r[c.date]) : undefined);
+  // Many brokers export newest first; a sale must never be applied before its purchase.
+  if (isTransactions && c.date != null && data.every((r) => !r.some((x) => x.trim()) || dateOf(r))) {
+    data = data.map((r, i) => ({ r, i })).sort((a, b) => (dateOf(a.r) ?? '').localeCompare(dateOf(b.r) ?? '') || a.i - b.i).map(({ r }) => r);
+  }
 
-  const byKey = new Map<string, ImportedHolding & { cost_total: number }>();
+  const byKey = new Map<string, ImportedHolding & { cost_total: number; lots: Lot[] }>();
   for (const r of data) {
     const isin = c.isin != null ? r[c.isin]?.toUpperCase() : undefined;
     const symbol = c.symbol != null ? r[c.symbol] : undefined;
@@ -172,24 +199,40 @@ export function parseGenericTable(rows: string[][], format: string): ParseResult
     const sign = isTransactions ? (BUY.test(type) ? 1 : SELL.test(type) ? -1 : 0) : 1;
     if (sign === 0) continue; // dividends, fees, deposits in a transaction list
     const h = byKey.get(id) ?? {
-      isin, symbol, name: c.name != null ? r[c.name] : undefined, shares: 0, avg_cost: 0, cost_total: 0,
+      isin, symbol, name: c.name != null ? r[c.name] : undefined, shares: 0, avg_cost: 0, cost_total: 0, lots: [],
       currency: (c.currency != null ? r[c.currency] : '') || baseCurrency(), asset_type: assetType(isTransactions ? undefined : type),
     };
     if (sign > 0) {
       if (!Number.isFinite(price)) warnings.push(`${id}: a buy without a price; average cost may be off`);
-      h.cost_total += shares * (Number.isFinite(price) ? price : 0);
+      const p = Number.isFinite(price) ? price : 0;
+      h.cost_total += shares * p;
       h.shares += shares;
+      h.lots.push({ date: dateOf(r) ?? '', shares, price: p });
     } else {
-      // Average-cost method: a sale removes shares at the current average.
+      if (shares > h.shares + 1e-9) warnings.push(`${id}: sells more than the export shows was bought; holding may be off`);
+      // Average cost (what brokers display) falls with the shares; the lots are
+      // used oldest first (FIFO), which is what the tax on a later sale follows.
       const avg = h.shares ? h.cost_total / h.shares : 0;
       h.shares -= shares;
       h.cost_total -= avg * shares;
+      let left = shares;
+      while (left > 1e-9 && h.lots.length) {
+        const lot = h.lots[0]!;
+        const used = Math.min(lot.shares, left);
+        lot.shares -= used;
+        left -= used;
+        if (lot.shares <= 1e-9) h.lots.shift();
+      }
     }
     byKey.set(id, h);
   }
+  const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
   const holdings = [...byKey.values()]
     .filter((h) => h.shares > 1e-9)
-    .map(({ cost_total, ...h }) => ({ ...h, shares: Math.round(h.shares * 1e6) / 1e6, avg_cost: Math.round((cost_total / h.shares) * 1e4) / 1e4 }));
+    .map(({ cost_total, lots, ...h }) => ({
+      ...h, shares: round6(h.shares), avg_cost: Math.round((cost_total / h.shares) * 1e4) / 1e4,
+      ...(isTransactions ? { lots: lots.map((l) => ({ ...l, shares: round6(l.shares) })) } : {}),
+    }));
   return { format: isTransactions ? `${format} (transactions → holdings)` : format, holdings, warnings };
 }
 

@@ -62,6 +62,11 @@ export interface Position {
   face_value?: number;
   /** Funds only: share of the fund's distributions that is tax-exempt in Germany (Teilfreistellung). Default 30 for ETFs. */
   partial_exemption_pct?: number;
+  /** Purchases still held, oldest first, prices in `currency`. Present when imported from a transaction list; sales use them first-in, first-out. */
+  lots?: { date: string; shares: number; price: number }[];
+  /** For rebalancing by region or sector: from Yahoo's company profile, or set by the owner (/targets tag). Lower case. */
+  region?: string;
+  sector?: string;
 }
 
 export type AssetType = 'stock' | 'etf' | 'bond' | 'cash';

@@ -98,6 +98,7 @@ async function toPosition(h: ImportedHolding, account: string, market: MarketDat
     isin: h.isin,
     name: h.name,
     account,
+    ...(h.lots ? { lots: h.lots } : {}),
   };
 }
 
@@ -122,7 +123,8 @@ export async function previewImport(text: string, account: string, market: Marke
         kind: same ? 'unchanged' : 'update',
         before: { shares: existing.shares, avg_cost: existing.avg_cost },
         position: { ...existing, shares: pos.shares, avg_cost: pos.avg_cost, currency: pos.currency, isin: pos.isin ?? existing.isin,
-          name: pos.name ?? existing.name, asset_type: existing.asset_type ?? pos.asset_type, data_symbol: existing.data_symbol ?? pos.data_symbol, account },
+          name: pos.name ?? existing.name, asset_type: existing.asset_type ?? pos.asset_type, data_symbol: existing.data_symbol ?? pos.data_symbol, account,
+          lots: pos.lots ?? existing.lots },
       });
     } else {
       changes.push({ kind: 'add', position: pos });

@@ -47,6 +47,8 @@ export interface MarketData {
   searchIsin(isin: string): Promise<IsinMatch[]>;
   /** Dividend-relevant fundamentals (numbers only; missing ones omitted). */
   fundamentals(symbol: string): Promise<Record<string, number> | null>;
+  /** Company sector and country of headquarters (companies only; funds have none). */
+  profile?(symbol: string): Promise<{ sector?: string; country?: string } | null>;
 }
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
@@ -152,6 +154,12 @@ export const yahoo: MarketData = {
     const rate = out.dividendRate ?? out.trailingAnnualDividendRate;
     if (rate && out.sharesOutstanding && out.freeCashflow) out.fcfDividendCover = out.freeCashflow / (rate * out.sharesOutstanding);
     return out;
+  },
+
+  async profile(symbol) {
+    const r = await quoteSummary(symbol, 'assetProfile');
+    const p = r?.assetProfile;
+    return p ? { sector: p.sector || undefined, country: p.country || undefined } : null;
   },
 
   async rate(from, to) {

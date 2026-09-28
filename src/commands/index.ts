@@ -48,7 +48,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'done', description: 'Record a payment as handled according to your plan', category: 'Portfolio', usage: '/done KO:2026-09-15' },
   { name: 'reserve', description: 'Balance of the cash reserve for down markets', category: 'Portfolio' },
   { name: 'tax', description: 'Tax residence, per-account W-8BEN and withholding, allowance left', category: 'Portfolio', usage: '/tax set residence DE' },
-  { name: 'targets', description: 'Target weights for rebalancing', category: 'Portfolio', usage: '/targets set stock 50 etf 40 cash 10' },
+  { name: 'targets', description: 'Rebalancing targets by holding, asset type, region or sector; band, fees', category: 'Portfolio', usage: '/targets set stock 50 etf 40 cash 10 · /targets mode region · /targets fee 1 0.1' },
   { name: 'rebalance', description: 'How far holdings drifted and the trades that fix it', category: 'Portfolio', usage: '/rebalance [cash 1000]' },
 
   // --- Session

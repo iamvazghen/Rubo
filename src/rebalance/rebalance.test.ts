@@ -25,7 +25,7 @@ describe('rebalancing', () => {
 
   test('new cash goes to the underweight first, with no sale and no tax', () => {
     const p = proposeRebalance({ ...base, newCash: 4000 });
-    expect(p.trades).toEqual([{ side: 'buy', key: 'etf', amount: 4000, funded_by: 'new cash' }]);
+    expect(p.trades).toEqual([{ side: 'buy', key: 'etf', amount: 4000, est_fee: 0, funded_by: 'new cash' }]);
     expect(p.est_tax).toBe(0);
   });
 
@@ -56,5 +56,46 @@ describe('rebalancing', () => {
   test('the cash reserve counts as cash when cash has a target', () => {
     const { drifts } = computeDrift(holdings, 1000, { ...targets, targets: { stock: 50, etf: 40, cash: 10 } });
     expect(drifts.find((d) => d.key === 'cash')).toMatchObject({ value: 1000, weight_pct: 9.09 });
+  });
+});
+
+describe('rebalancing: lots, fees, weights after, regions', () => {
+  test('with purchase lots, the sale is taxed on the oldest shares first (FIFO)', () => {
+    // KO: 50 bought at 40, then 50 at 60 (average 50). Selling 28.5714 at 70 uses only the 40 lot.
+    const ko = { ...pos('KO', 'stock', 100, 50), lots: [{ date: '2020-01-01', shares: 50, price: 40 }, { date: '2024-01-01', shares: 50, price: 60 }] };
+    const p = proposeRebalance({ ...base, holdings: [held(ko, 70), holdings[1]!], newCash: 0 });
+    const sell = p.trades.find((t) => t.side === 'sell')!;
+    expect(sell.cost_basis).toBe('fifo');
+    // Gain 28.5714 x (70 - 40) = 857.14 x 26.375 % = 226.07 (average cost would say 150.71)
+    expect(sell.est_tax).toBeCloseTo(226.07, 1);
+    expect(p.notes.join(' ')).not.toContain('average cost');
+  });
+
+  test('fees are charged per trade, reduce the gain and what the sales can buy', () => {
+    const p = proposeRebalance({ ...base, targets: { ...targets, fee_fixed: 1, fee_pct: 0.1 }, newCash: 0 });
+    const sell = p.trades.find((t) => t.side === 'sell')!;
+    const buy = p.trades.find((t) => t.side === 'buy')!;
+    expect(sell.est_fee).toBe(3); // 1 + 0.1 % of 2000
+    // Proceeds 1997 buy 1994.01 of ETF (1994.01 + 1 + 1.99 fee = 1997)
+    expect(buy.amount).toBeCloseTo(1994.01, 2);
+    expect(p.est_fees).toBeCloseTo(3 + 2.99, 2);
+    // Gain 571.43 - 3 = 568.43 x 26.375 % = 149.92
+    expect(sell.est_tax).toBeCloseTo(149.92, 1);
+  });
+
+  test('weights after the trades are reported next to the current ones', () => {
+    const p = proposeRebalance({ ...base, newCash: 0 });
+    expect(p.drifts.find((d) => d.key === 'stock')).toMatchObject({ weight_pct: 70, after_pct: 50 });
+    expect(p.drifts.find((d) => d.key === 'etf')!.after_pct).toBe(50);
+  });
+
+  test('targets by region; holdings without one are named, not guessed', () => {
+    const us = { ...pos('KO', 'stock', 100, 50), region: 'north_america' };
+    const eu = { ...pos('DTE', 'stock', 100, 20), region: 'europe' };
+    const unknown = pos('VT', 'etf', 10, 100);
+    const t: Targets = { ...targets, mode: 'region', targets: { north_america: 50, europe: 50 } };
+    const p = proposeRebalance({ ...base, holdings: [held(us, 70), held(eu, 30), held(unknown, 100)], targets: t, newCash: 0 });
+    expect(p.drifts.map((d) => d.key).sort()).toEqual(['europe', 'north_america', 'unassigned']);
+    expect(p.notes.join(' ')).toContain('no region known for VT');
   });
 });
