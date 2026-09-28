@@ -437,7 +437,7 @@ export function getToolRegistry(model: string): RegisteredTool[] {
     { name: 'income_confirm', tool: incomeConfirm, description: 'Record a payment as handled per plan. Only when the owner says it is done.', compactDescription: 'Mark an income payment as handled.', concurrencySafe: false },
     { name: 'rebalance_proposal', tool: rebalanceProposal, description: 'Drift from target weights and tax-aware trades to fix it. Suggestions only.', compactDescription: 'Rebalancing drift and suggested trades.', concurrencySafe: true },
     { name: 'rebalance_targets', tool: rebalanceTargets, description: 'Show or set rebalancing target weights. Confirm before changing.', compactDescription: 'Show or set target weights.', concurrencySafe: false },
-    { name: 'portfolio_import', tool: portfolioImport, description: 'Preview a Trade Republic/IBKR CSV import, or apply it after the owner confirmed.', compactDescription: 'Import holdings from a broker CSV.', concurrencySafe: false },
+    { name: 'portfolio_import', tool: portfolioImport, description: 'Preview a broker CSV import, or apply it after the owner confirmed.', compactDescription: 'Import holdings from a broker CSV.', concurrencySafe: false },
   );
 
   // Jev judgements: only with a TypeSafe key.

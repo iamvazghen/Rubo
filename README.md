@@ -21,6 +21,7 @@ Ships configured for **MiniMax M2.5**, and wired to 10 LLM providers (OpenAI · 
 - [Prerequisites](#prerequisites)
 - [Install](#install)
 - [Run](#run)
+- [Jev judgement layer](#jev-judgement-layer)
 - [Slash commands](#slash-commands)
 - [Evaluate](#evaluate)
 - [Debug](#debug)
@@ -351,11 +352,50 @@ How it works:
   A domestic broker that withholds takes the tax at payment; otherwise it is due with your return and is set aside before your plan is applied. To add a country, add an entry to `jurisdictions.ts` with a test.
 - **Reminders.** A nightly job (06:30 your time, on the gateway) refreshes the calendar and schedules two Telegram messages per payment: before the ex-date, and on the pay date with your plan already worked out. The numbers are computed and sent verbatim, never generated.
 - **Rebalancing.** New cash and the reinvested part of income due in 30 days go to underweights first; only then are overweights sold, with the tax on the gain estimated. A quarterly job alerts only when something leaves its band. Rubo never places trades.
-- **Jev** (with `TYPESAFE_API_KEY`). `dividend_safety`, `thesis_check` and `news_materiality` return probabilities; payment reminders mention a cut risk of 20 % or more. Jev never changes a grade or an amount; every judgement is logged to `.rubo/judgements.jsonl`.
+- **Jev** (optional). Probabilities for questions that are judgement, not arithmetic: will this dividend be cut, does the thesis still hold, does this news matter. See [Jev judgement layer](#jev-judgement-layer).
 
 The gateway sends the reminders, so the VPS must know your holdings: import through Telegram, or import in the CLI and run `rubo push`. `rubo pull` brings the VPS state back down. The launcher finds its checkout from its own location (or `RUBO_REPO`); `pull`, `push`, `vps` and `logs` need `RUBO_VPS=user@host`, and `RUBO_VPS_HOME` / `RUBO_VPS_UNIT` if your server does not use `~/.rubo` and `rubo-gateway`.
 
 The CLI launches a TUI with a banner, status bar (model · tokens · cost · iter · t/s), command palette (`Ctrl+P`), watchlist sidebar, and input area. Slash commands are auto-completed.
+
+---
+
+## Jev judgement layer
+
+[Jev](https://typesafe.ai) (TypeSafe System One) answers typed questions about a piece of state with calibrated probabilities. Rubo uses it for the few questions that are judgement rather than arithmetic. It is optional: without `TYPESAFE_API_KEY` in `.env`, the three tools below are not offered to the model and reminders simply omit the cut risk. Everything else works the same.
+
+**What Jev may and may not do.** Jev adds a probability next to a result. It never changes a grade, a tax figure, an allocation or any other computed amount, and it is never asked to predict a price. The model must present its answers as probabilities ("Jev puts the chance of a cut at 29 %"), not as facts.
+
+**How it is called.** Every request goes through one function, `judge()` in `src/judge/jev.ts`:
+
+```
+POST https://api.typesafe.ai/v1/systemone
+Authorization: Bearer $TYPESAFE_API_KEY
+{ "model": "jev-latest", "state": { …facts… }, "questions": { "<id>": { "type": "noul" | "choice" | "score", "instructions": "…", "criteria": … } } }
+```
+
+- `noul` returns the probability that a statement is true, `choice` picks one of named options (with a probability for each), `score` places the state on an ordered list of criteria.
+- `state` holds only facts Rubo already has (Yahoo fundamentals, your stored thesis, the evidence or news the model gathered). Jev reasons over that and nothing else.
+- Answers are cached per question and subject (a day by default, a week for dividend safety), so a nightly refresh does not pay twice.
+- A failed call, a timeout (60 s) or a missing key returns nothing, and Rubo carries on without the judgement.
+- Every answer is appended to `.rubo/judgements.jsonl` with its date, model version and token usage, so judgements can later be scored against what happened, the same way grades are.
+
+**Where it is used.**
+
+| Tool / place | Question asked | State given to Jev |
+|---|---|---|
+| `dividend_safety` | Will the company cut or suspend its dividend within 12 months? (`noul`) | Payout ratio, free-cash-flow cover of the dividend, debt/equity, earnings and revenue growth, yield vs its 5-year average |
+| `thesis_check` | Is the thesis for this holding still intact? (`noul`), and does the new evidence strengthen, not change or weaken it? (`choice`) | The stored thesis, opening date, conviction, and the new evidence |
+| `news_materiality` | Would this news plausibly change an investor's decision? (`noul`), and which direction? (`choice`) | The news item and the stored thesis |
+| Income reminders | The `dividend_safety` question, for dividends paid in the next 45 days | As above; the reminder mentions it only at 20 % or more |
+
+Example ledger line:
+
+```json
+{"at":"2026-09-28T16:38:38Z","kind":"dividend_safety","subject":"KO","model":"jev-1.13.0","usage":{"input_tokens":648,"output_tokens":20},"answers":{"cut":{"type":"noul","noul":0.29}}}
+```
+
+A judgement is only as good as its state: a year with an unusually low free cash flow (a one-off tax payment, say) raises the cut probability even for a long-standing payer. Read it together with the fundamentals it was given, which `dividend_safety` returns alongside the probability.
 
 ---
 
