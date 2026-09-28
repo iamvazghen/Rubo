@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getChannelProfile } from './channels.js';
-import { antoinePath } from '../utils/paths.js';
+import { ruboPath } from '../utils/paths.js';
 import { getCurrentDate } from '../utils/format.js';
 import { DEFAULT_SYSTEM_PROMPT } from './default-prompt.js';
 import type { GroupContext } from './types.js';
@@ -26,7 +26,7 @@ const __dirname = dirname(__filename);
  * Load SOUL.md content from user override or bundled file.
  */
 export async function loadSoulDocument(): Promise<string | null> {
-  const userSoulPath = antoinePath('SOUL.md');
+  const userSoulPath = ruboPath('SOUL.md');
   try {
     return await readFile(userSoulPath, 'utf-8');
   } catch {
@@ -44,11 +44,11 @@ export async function loadSoulDocument(): Promise<string | null> {
 }
 
 /**
- * Load user-defined research rules from .antoine/RULES.md.
+ * Load user-defined research rules from .rubo/RULES.md.
  * Returns null if the file doesn't exist (rules are optional).
  */
 export async function loadRulesDocument(): Promise<string | null> {
-  const rulesPath = antoinePath('RULES.md');
+  const rulesPath = ruboPath('RULES.md');
   try {
     return await readFile(rulesPath, 'utf-8');
   } catch {
@@ -92,7 +92,7 @@ function buildMemorySection(memoryFiles: string[], memoryContext?: string | null
 
   return `## Memory
 
-You have persistent memory stored as Markdown files in .antoine/memory/.${fileListSection}${contextSection}
+You have persistent memory stored as Markdown files in .rubo/memory/.${fileListSection}${contextSection}
 
 ### Recalling memories
 Use memory_search to recall stored facts, preferences, or notes. The search covers all
@@ -232,7 +232,7 @@ export function buildSystemPrompt(
   // Measured: an identical prompt caches 93%, the same prompt with tomorrow's
   // date caches 0%. It lives in the volatile tail now, with memory and the
   // portfolio, so a rollover costs only the tail.
-  return `You are Antoine, a ${profile.label} assistant with access to research tools.
+  return `You are Rubo, a ${profile.label} assistant with access to research tools.
 
 ${profile.preamble}
 
@@ -273,7 +273,7 @@ ${rulesContent}
 ## Rule Management
 
 To manage research rules, the user can say "add a rule", "show my rules", "remove rule about X".
-Rules are stored in .antoine/RULES.md — use write_file or edit_file to modify them.
+Rules are stored in .rubo/RULES.md — use write_file or edit_file to modify them.
 
 ${soulContent ? `## Identity
 

@@ -122,14 +122,15 @@ describe('startup noise', () => {
 
 describe('responsive layout', () => {
   test('the block banner is dropped when the terminal is too narrow for it', () => {
-    // 58 columns of block letters wrap into rubble on a narrow window.
+    // 36 columns of block letters wrap into rubble on a narrow window.
     const wide = renderedText(new IntroComponent('gpt-4o', 'OpenAI', 3));
     expect(wide).toContain('█');
 
     const narrow = new IntroComponent('gpt-4o', 'OpenAI', 3);
-    const narrowText = narrow.render(50).join('\n');
+    const narrowText = narrow.render(30).join('\n');
     expect(narrowText).not.toContain('█');
-    expect(narrowText).toContain('ANTOINE');
+    // The name stays on screen, in the welcome box.
+    expect(narrowText).toContain('Rubo');
   });
 
   test('a very narrow terminal drops the wordmark too but keeps the facts', () => {
@@ -159,7 +160,9 @@ describe('responsive layout', () => {
     // The bug this guards: layout is decided at build time, so without a
     // rebuild the banner stays collapsed after the window grows.
     const intro = new IntroComponent('gpt-4o', 'OpenAI', 3);
-    expect(intro.render(50).join('\n')).not.toContain('█');
+    expect(intro.render(30).join('\n')).not.toContain('█');
     expect(intro.render(120).join('\n')).toContain('█');
+    // ...and shrinking again drops it again instead of keeping the wide layout.
+    expect(intro.render(30).join('\n')).not.toContain('█');
   });
 });

@@ -11,6 +11,7 @@ import { Container, Text, TruncatedText } from '@mariozechner/pi-tui';
 import { theme } from '../theme.js';
 import { formatTokensCompact } from '../utils/format.js';
 import { formatUsd } from '../utils/cost.js';
+import { fitSegments, type Segment } from './layout.js';
 import { getModelCapabilities } from '../model/capabilities.js';
 
 export interface StatusStats {
@@ -28,6 +29,7 @@ export class StatusBarComponent extends Container {
   private modelId = '';
   private stats: StatusStats | null = null;
   private lastRendered = '';
+  private segments: Segment[] = [];
 
   constructor() {
     super();
@@ -59,17 +61,19 @@ export class StatusBarComponent extends Container {
     if (!this.providerLabel && !this.stats && !this.modelId) {
       this.summaryText.setText('');
       this.lastRendered = '';
+      this.segments = [];
       return;
     }
 
-    const parts: string[] = [];
-    if (this.providerLabel) parts.push(theme.primary(this.providerLabel));
+    // Priority decides what survives a narrow window: lower numbers stay longest.
+    const parts: Segment[] = [];
+    if (this.providerLabel) parts.push({ text: theme.primary(this.providerLabel), priority: 1 });
 
     if (this.modelId) {
       const caps = getModelCapabilities(this.modelId);
       // Dim for a plain model, accented for a thinking one - the badge is
       // meant to be readable at a glance, not to compete with the numbers.
-      parts.push(caps.reasoning ? theme.accent(caps.label) : theme.muted(caps.label));
+      parts.push({ text: caps.reasoning ? theme.accent(caps.label) : theme.muted(caps.label), priority: 4 });
     }
 
     // Suppress the whole stats group until something has actually run:
@@ -81,14 +85,25 @@ export class StatusBarComponent extends Container {
     if (this.stats && hasActivity) {
       const { inputTokens, outputTokens, costUsd, iter, maxIter, tokensPerSecond } = this.stats;
       const tokenLine = `${theme.muted('↓')}${formatTokensCompact(inputTokens)} ${theme.muted('↑')}${formatTokensCompact(outputTokens)}`;
-      parts.push(theme.muted(tokenLine));
-      parts.push(theme.warning(formatUsd(costUsd)));
-      parts.push(theme.muted(`iter ${iter}/${maxIter}`));
-      if (tokensPerSecond != null) parts.push(theme.info(`${formatTokensCompact(tokensPerSecond)} t/s`));
+      parts.push({ text: theme.muted(tokenLine), priority: 3 });
+      parts.push({ text: theme.warning(formatUsd(costUsd)), priority: 2 });
+      parts.push({ text: theme.muted(`iter ${iter}/${maxIter}`), priority: 5 });
+      if (tokensPerSecond != null) parts.push({ text: theme.info(`${formatTokensCompact(tokensPerSecond)} t/s`), priority: 6 });
     }
 
-    this.lastRendered = parts.join(theme.muted(' · '));
+    this.segments = parts;
+    this.lastRendered = parts.map((p) => p.text).join(theme.muted(' · '));
     this.summaryText.setText(this.lastRendered);
+  }
+
+  /**
+   * Always exactly one line. A wrapping status bar pushes the editor down a row
+   * and makes it jump on every resize, so segments are dropped (least important
+   * first) until the line fits the window it is drawn in.
+   */
+  render(width: number): string[] {
+    if (this.segments.length === 0) return [];
+    return [fitSegments(this.segments, width, theme.muted(' · '))];
   }
 }
 

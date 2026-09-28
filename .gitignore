@@ -52,8 +52,10 @@ yarn-error.log*
 # Cursor files
 .cursor/
 
-# Antoine context files (offloaded tool outputs)
-.antoine/*
+# Rubo context files (offloaded tool outputs)
+.rubo/*
+# Pre-rename state directory (project was called Antoine) - still private data
+.antoine/
 
 
 logs/

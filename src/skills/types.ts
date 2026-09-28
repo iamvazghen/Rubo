@@ -1,7 +1,7 @@
 /**
  * Source of a skill definition.
- * - builtin: Shipped with Antoine (src/skills/builtin/)
- * - project: Project-level skills (.antoine/skills/)
+ * - builtin: Shipped with Rubo (src/skills/builtin/)
+ * - project: Project-level skills (.rubo/skills/)
  */
 export type SkillSource = 'builtin' | 'user' | 'project';
 

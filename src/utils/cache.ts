@@ -5,13 +5,13 @@
  * Callers opt in by passing `{ cacheable: true }` to API calls;
  * the cache module unconditionally stores and retrieves keyed JSON.
  *
- * Cache files live in .antoine/cache/ (already gitignored via .antoine/*).
+ * Cache files live in .rubo/cache/ (already gitignored via .rubo/*).
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { createHash } from 'crypto';
 import { logger } from './logger.js';
-import { antoinePath } from './paths.js';
+import { ruboPath } from './paths.js';
 
 // ============================================================================
 // Types
@@ -32,14 +32,14 @@ interface CacheEntry {
 /**
  * Resolved per call, not frozen at import.
  *
- * As a module-level constant this captured whatever ANTOINE_HOME held when the
+ * As a module-level constant this captured whatever RUBO_HOME held when the
  * module first loaded, so a later change was ignored - which meant the test
  * suite wrote into the real cache directory while asserting against a scratch
  * one, and two cases failed for reasons that had nothing to do with the cache.
  * The same frozen-constant pattern is still used for other state paths; they are
  * set before launch in production, but the pattern is a trap.
  */
-const cacheDir = () => antoinePath('cache');
+const cacheDir = () => ruboPath('cache');
 
 // ============================================================================
 // Helpers

@@ -1,7 +1,11 @@
-import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { antoinePath } from './paths.js';
+import { ruboPath } from './paths.js';
+import { getSetting } from './config.js';
+
+/** Where a session was started. Part of the id, so it is visible wherever the id is. */
+export type SessionOrigin = 'cli' | 'telegram';
 
 /**
  * A single completed exchange within a session.
@@ -13,12 +17,17 @@ export interface SessionTurn {
 }
 
 /**
- * A persisted, resumable conversation thread. One file per session lives in
- * `.antoine/sessions/<id>.json`. Sessions let the user pick up a research
- * thread later with full multi-turn context restored into the model.
+ * A persisted, resumable conversation thread, from the CLI or from Telegram.
+ * One file per session in `.rubo/sessions/`. Either surface can resume a
+ * session the other one started, with full multi-turn context restored.
+ *
+ * Ids are `<origin>:<local date>_<time>`, e.g. `telegram:2026-09-28_14-05-12`:
+ * where it started, then when, so a thread can be found by what the user
+ * remembers - "the one from Telegram on Monday afternoon".
  */
 export interface SessionFile {
   id: string;
+  origin: SessionOrigin;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -31,6 +40,7 @@ export interface SessionFile {
  */
 export interface SessionSummary {
   id: string;
+  origin: SessionOrigin;
   title: string;
   updatedAt: string;
   turnCount: number;
@@ -39,16 +49,46 @@ export interface SessionSummary {
 const SESSIONS_DIR = 'sessions';
 
 function sessionsDir(): string {
-  return antoinePath(SESSIONS_DIR);
+  return ruboPath(SESSIONS_DIR);
 }
 
+/** Windows forbids ':' in file names, so the origin separator becomes '_' on disk. */
 function sessionPath(id: string): string {
-  return join(sessionsDir(), `${id}.json`);
+  return join(sessionsDir(), `${id.replace(':', '_')}.json`);
 }
 
-function makeId(): string {
-  // Sortable, filesystem-safe: 2026-06-19T14-22-05-123Z
-  return new Date().toISOString().replace(/[:.]/g, '-');
+/**
+ * Local wall-clock time for ids. The gateway runs on a UTC server, so "local" is
+ * a setting rather than the machine's clock - otherwise Telegram ids would be
+ * two hours off the CLI ones for a user in Köln.
+ */
+function timeZone(): string {
+  return getSetting<string>('timezone', process.env.RUBO_TIMEZONE || 'Europe/Berlin');
+}
+
+/** `2026-09-28_14-05-12` in the configured time zone. Sorts chronologically as text. */
+export function formatSessionStamp(date: Date, tz = timeZone()): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    }).formatToParts(date).map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}_${parts.hour}-${parts.minute}-${parts.second}`;
+}
+
+/** A fresh, unused id. Two sessions started in the same second get a -2, -3 suffix. */
+export function makeSessionId(origin: SessionOrigin, date = new Date()): string {
+  const base = `${origin}:${formatSessionStamp(date)}`;
+  let id = base;
+  for (let n = 2; existsSync(sessionPath(id)); n++) id = `${base}-${n}`;
+  return id;
+}
+
+/** Accepts `cli:…`, `telegram:…`, or the on-disk form `cli_…`. */
+export function normalizeSessionId(id: string): string {
+  return id.trim().replace(/^(cli|telegram)_/, '$1:');
 }
 
 function deriveTitle(query: string): string {
@@ -69,10 +109,12 @@ export class SessionStore {
   }
 
   /** Start a brand-new session. */
-  static create(model: string): SessionStore {
-    const now = new Date().toISOString();
+  static create(model: string, origin: SessionOrigin): SessionStore {
+    const date = new Date();
+    const now = date.toISOString();
     return new SessionStore({
-      id: makeId(),
+      id: makeSessionId(origin, date),
+      origin,
       title: 'New session',
       createdAt: now,
       updatedAt: now,
@@ -121,18 +163,43 @@ export class SessionStore {
   }
 }
 
+/**
+ * Sessions saved before ids carried their origin (all of them from the CLI, id
+ * `2026-06-18T23-48-34-736Z`) are rewritten once into the current form, so every
+ * listing and every `/resume` sees a single scheme. Idempotent.
+ */
+async function migrateLegacySessions(): Promise<void> {
+  const dir = sessionsDir();
+  if (!existsSync(dir)) return;
+  for (const file of await readdir(dir)) {
+    if (!file.endsWith('.json') || /^(cli|telegram)_/.test(file)) continue;
+    const path = join(dir, file);
+    try {
+      const parsed = JSON.parse(await readFile(path, 'utf-8')) as Partial<SessionFile>;
+      if (!parsed.createdAt || !Array.isArray(parsed.turns)) continue;
+      const migrated = { ...parsed, origin: 'cli', id: makeSessionId('cli', new Date(parsed.createdAt)) } as SessionFile;
+      await writeFile(sessionPath(migrated.id), JSON.stringify(migrated, null, 2), 'utf-8');
+      await rm(path);
+    } catch {
+      // Not a session file; leave it alone.
+    }
+  }
+}
+
 /** Load a specific session by id, or null if it doesn't exist / is unreadable. */
 export async function loadSession(id: string): Promise<SessionFile | null> {
+  await migrateLegacySessions();
   try {
-    const content = await readFile(sessionPath(id), 'utf-8');
+    const content = await readFile(sessionPath(normalizeSessionId(id)), 'utf-8');
     return JSON.parse(content) as SessionFile;
   } catch {
     return null;
   }
 }
 
-/** List all saved sessions, newest first. */
-export async function listSessions(): Promise<SessionSummary[]> {
+/** List saved sessions from every surface (or one), newest first. */
+export async function listSessions(origin?: SessionOrigin): Promise<SessionSummary[]> {
+  await migrateLegacySessions();
   const dir = sessionsDir();
   if (!existsSync(dir)) return [];
   let files: string[];
@@ -150,8 +217,10 @@ export async function listSessions(): Promise<SessionSummary[]> {
       const parsed = JSON.parse(content) as SessionFile;
       // Skip empty sessions (created but never used) so the list stays useful.
       if (!parsed.turns || parsed.turns.length === 0) continue;
+      if (!parsed.origin || (origin && parsed.origin !== origin)) continue;
       summaries.push({
         id: parsed.id,
+        origin: parsed.origin,
         title: parsed.title,
         updatedAt: parsed.updatedAt,
         turnCount: parsed.turns.length,
@@ -166,8 +235,8 @@ export async function listSessions(): Promise<SessionSummary[]> {
 }
 
 /** The most recently updated non-empty session, or null if none exist. */
-export async function latestSession(): Promise<SessionFile | null> {
-  const summaries = await listSessions();
+export async function latestSession(origin?: SessionOrigin): Promise<SessionFile | null> {
+  const summaries = await listSessions(origin);
   const first = summaries[0];
   if (!first) return null;
   return loadSession(first.id);

@@ -26,7 +26,7 @@ const LABEL = 'SEC EDGAR';
 
 /** SEC asks for a contactable agent string; requests without one are refused. */
 const HEADERS = {
-  'User-Agent': process.env.SEC_USER_AGENT || 'Antoine Research antoine@example.com',
+  'User-Agent': process.env.SEC_USER_AGENT || 'Rubo Research rubo@example.com',
 };
 
 /** Metric -> XBRL concepts to try, in order of preference. */

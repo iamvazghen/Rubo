@@ -23,7 +23,7 @@ const LABEL = 'Yahoo Finance';
 const BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
 /** Yahoo rejects requests without a browser-ish agent. */
-const HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; Antoine/1.0)' };
+const HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; Rubo/1.0)' };
 
 /**
  * Our canonical exchange code -> Yahoo suffix. All verified live 2026-09-07.

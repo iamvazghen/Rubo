@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import { antoinePath } from './paths.js';
+import { ruboPath } from './paths.js';
 
-// ponytail: lazy so $ANTOINE_HOME set after module load still counts.
-const SETTINGS_FILE = () => antoinePath('settings.json');
+// ponytail: lazy so $RUBO_HOME set after module load still counts.
+const SETTINGS_FILE = () => ruboPath('settings.json');
 
 // Map legacy model IDs to provider IDs for migration
 const MODEL_TO_PROVIDER_MAP: Record<string, string> = {

@@ -6,7 +6,7 @@ import { getCurrentDate } from '../utils/format.js';
 /**
  * Default system prompt used when no specific prompt is provided.
  */
-export const DEFAULT_SYSTEM_PROMPT = `You are Antoine, a helpful AI assistant.
+export const DEFAULT_SYSTEM_PROMPT = `You are Rubo, a helpful AI assistant.
 
 Current date: ${getCurrentDate()}
 

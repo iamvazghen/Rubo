@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Release script for Antoine
+# Release script for Rubo
 # Usage: bash scripts/release.sh [version]
 # If no version is provided, bumps the patch segment of the current package.json version.
 
@@ -109,8 +109,8 @@ git push origin "$TAG"
 
 # Create GitHub release
 echo -e "$BODY" | gh release create "$TAG" \
-  --title "Antoine ${VERSION}" \
+  --title "Rubo ${VERSION}" \
   --notes-file -
 
 echo ""
-echo "Released ${TAG}: https://github.com/virattt/antoine/releases/tag/${TAG}"
+echo "Released ${TAG}: https://github.com/virattt/rubo/releases/tag/${TAG}"

@@ -3,18 +3,19 @@ import { createTelegramPlugin } from './channels/telegram/plugin.js';
 import type { TelegramInboundMessage } from './channels/telegram/index.js';
 import { resolveRoute } from './routing/resolve-route.js';
 import { resolveSessionStorePath, upsertSessionMeta } from './sessions/store.js';
+import { handleSessionCommand, openConversation } from './sessions/conversation.js';
 import { loadGatewayConfig, type GatewayConfig } from './config.js';
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from '../model/llm.js';
 import { runAgentForMessage, isSessionRunning, enqueueForSession } from './agent-runner.js';
 import { startCronRunner } from '../cron/runner.js';
 import { ensureHeartbeatCronJob } from '../cron/heartbeat-migration.js';
 import { appendFileSync } from 'node:fs';
-import { antoinePath } from '../utils/paths.js';
+import { ruboPath } from '../utils/paths.js';
 import { getSetting } from '../utils/config.js';
 import type { GroupContext } from '../agent/types.js';
 
-// ponytail: lazy so $ANTOINE_HOME set after module load still counts.
-const LOG_PATH = () => antoinePath('gateway-debug.log');
+// ponytail: lazy so $RUBO_HOME set after module load still counts.
+const LOG_PATH = () => ruboPath('gateway-debug.log');
 function debugLog(msg: string) {
   appendFileSync(LOG_PATH(), `${new Date().toISOString()} ${msg}\n`);
 }
@@ -55,7 +56,7 @@ async function handleTelegramInbound(
   });
 
   const storePath = resolveSessionStorePath(route.agentId);
-  upsertSessionMeta({
+  const meta = upsertSessionMeta({
     storePath,
     sessionKey: route.sessionKey,
     channel: 'telegram',
@@ -63,6 +64,20 @@ async function handleTelegramInbound(
     accountId: route.accountId,
     agentId: route.agentId,
   });
+  const model = getSetting('modelId', DEFAULT_MODEL) as string;
+  const conversationCtx = {
+    storePath,
+    sessionKey: route.sessionKey,
+    activeSessionId: meta.activeSessionId,
+    model,
+  };
+
+  // /new, /sessions, /resume, /session are answered here, not by the model.
+  const commandReply = await handleSessionCommand(inbound.body, conversationCtx);
+  if (commandReply !== null) {
+    await inbound.reply(commandReply);
+    return;
+  }
 
   // Keep a typing indicator alive during long agent runs.
   const TYPING_INTERVAL_MS = 5000;
@@ -89,7 +104,6 @@ async function handleTelegramInbound(
     const groupContext: GroupContext | undefined = isGroup
       ? { groupName: inbound.from, activationMode: 'mention' }
       : undefined;
-    const model = getSetting('modelId', DEFAULT_MODEL) as string;
     const modelProvider = getSetting('provider', DEFAULT_PROVIDER) as string;
 
     if (isSessionRunning(route.sessionKey)) {
@@ -99,7 +113,10 @@ async function handleTelegramInbound(
       return;
     }
 
-    debugLog(`[telegram] running agent for session=${route.sessionKey}`);
+    // Saved thread for this chat - reloaded into memory if the gateway restarted.
+    const conversation = await openConversation(conversationCtx);
+
+    debugLog(`[telegram] running agent for session=${route.sessionKey} conversation=${conversation.id}`);
     const startedAt = Date.now();
     const reply = await runAgentForMessage({
       sessionKey: route.sessionKey,
@@ -116,6 +133,7 @@ async function handleTelegramInbound(
     stopTypingLoop();
 
     if (answer.trim()) {
+      await conversation.appendTurn(query, answer.trim());
       await inbound.reply(answer.trim(), reasoning);
       console.log(`Sent telegram reply (${answer.length} chars, ${durationMs}ms)`);
     } else {

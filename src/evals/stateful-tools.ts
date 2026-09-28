@@ -4,7 +4,7 @@
  * provider-health.ts skips 16 tools because they mutate state, block for input,
  * or cost real money to run. "Skipped for a reason" and "never tested" look
  * identical in a summary line, so this covers the same list against a scratch
- * ANTOINE_HOME: the portfolio, memory, cron and heartbeat writes land in a
+ * RUBO_HOME: the portfolio, memory, cron and heartbeat writes land in a
  * throwaway directory that is deleted at the end, and the real state is never
  * touched.
  *
@@ -18,8 +18,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Must be set before anything reads a path.
-const SCRATCH = mkdtempSync(join(tmpdir(), 'antoine-eval-'));
-process.env.ANTOINE_HOME = SCRATCH;
+const SCRATCH = mkdtempSync(join(tmpdir(), 'rubo-eval-'));
+process.env.RUBO_HOME = SCRATCH;
 mkdirSync(join(SCRATCH, 'memory'), { recursive: true });
 writeFileSync(
   join(SCRATCH, 'memory', 'MEMORY.md'),
@@ -72,11 +72,11 @@ async function step(
 const has = (needle: string) => (out: string) => out.toLowerCase().includes(needle.toLowerCase());
 const noError = (out: string) => !/"success"\s*:\s*false|^error|"error"\s*:/i.test(out.trim());
 
-console.log(`scratch ANTOINE_HOME: ${SCRATCH}`);
+console.log(`scratch RUBO_HOME: ${SCRATCH}`);
 console.log(`registry: ${registry.length} tools\n--- filesystem`);
 
 // ---------------------------------------------------------------- filesystem
-const testFile = '.antoine-eval-scratch.txt';
+const testFile = '.rubo-eval-scratch.txt';
 await step('write_file', { path: testFile, content: 'hello\nsecond line\n' }, has('bytesWritten'));
 await step('read_file', { path: testFile }, has('second line'));
 await step(
@@ -127,7 +127,7 @@ const added = await step(
   'cron',
   {
     action: 'add',
-    name: 'antoine-eval-temp',
+    name: 'rubo-eval-temp',
     schedule: { kind: 'every', everyMs: 86_400_000 },
     message: 'Evaluation harness job; removed in the same run.',
   },
@@ -151,7 +151,7 @@ const { browserLaunchBlockReason } = await import('../tools/browser/browser.js')
 const browserBlocked = browserLaunchBlockReason({
   isBun: typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined',
   platform: process.platform,
-  force: process.env.ANTOINE_BROWSER_FORCE === '1',
+  force: process.env.RUBO_BROWSER_FORCE === '1',
 });
 if (browserBlocked) {
   record('browser', 'SKIP', browserBlocked);

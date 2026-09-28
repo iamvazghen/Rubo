@@ -88,7 +88,7 @@ export class HelpPanelComponent extends Container {
     this.addChild(new Spacer(1));
     this.addChild(
       new Text(
-        `  ${theme.muted('Tip: start with')} ${theme.primaryLight('antoine --resume')} ${theme.muted('to continue your last session.')}`,
+        `  ${theme.muted('Tip: start with')} ${theme.primaryLight('rubo --resume')} ${theme.muted('to continue your last session.')}`,
         0,
         0,
       ),

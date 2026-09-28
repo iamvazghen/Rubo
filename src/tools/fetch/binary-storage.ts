@@ -8,11 +8,11 @@
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { antoinePath } from '../../utils/paths.js';
+import { ruboPath } from '../../utils/paths.js';
 
 // Directory where binary downloads are persisted.
-// ponytail: lazy so $ANTOINE_HOME set after module load still counts.
-const WEB_FETCH_OUTPUT_DIR = () => antoinePath('web-fetch');
+// ponytail: lazy so $RUBO_HOME set after module load still counts.
+const WEB_FETCH_OUTPUT_DIR = () => ruboPath('web-fetch');
 
 // Content types that are textual and therefore never treated as binary, even
 // though their top-level type may not be `text/*`.

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { Container, ProcessTerminal, Spacer, Text, TUI } from '@mariozechner/pi-tui';
+import { Container, Spacer, Text, TUI } from '@mariozechner/pi-tui';
+import { RuboTerminal } from './terminal.js';
 import type {
   ApprovalDecision,
   ToolEndEvent,
@@ -12,7 +13,7 @@ import {
   getProviderDisplayName,
   getSearchProviderDisplayName,
 } from './utils/env.js';
-import { antoinePath } from './utils/paths.js';
+import { ruboPath } from './utils/paths.js';
 import { HelpPanelComponent } from './components/help-panel.js';
 import { getModelCapabilities } from './model/capabilities.js';
 import { defaultQueue } from './utils/message-queue.js';
@@ -238,7 +239,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
   const resumeRequest = parseResumeArg(argv);
   // Apply the saved color theme before the first render.
   setActiveTheme(getSetting<ThemeName>('theme', 'emerald'));
-  const tui = new TUI(new ProcessTerminal());
+  const tui = new TUI(new RuboTerminal());
   const root = new Container();
   const chatLog = new ChatLogComponent(tui);
   const inputHistory = new InputHistoryController(() => tui.requestRender());
@@ -268,7 +269,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
     renderSelectionOverlay();
     tui.requestRender();
   });
-  sessionStore = SessionStore.create(modelSelection.model);
+  sessionStore = SessionStore.create(modelSelection.model, 'cli');
 
   // Incremental history tracking
   let lastRenderedEventCount = 0;
@@ -412,8 +413,8 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
   const editor = new CustomEditor(tui, editorTheme);
   const hintBar = new HintBarComponent();
   // Debug panel is a developer aid (raw log lines under the input). Hidden by
-  // default so end users see a single clean input; enable with ANTOINE_DEBUG=1.
-  const debugPanel = new DebugPanelComponent(8, !!process.env.ANTOINE_DEBUG);
+  // default so end users see a single clean input; enable with RUBO_DEBUG=1.
+  const debugPanel = new DebugPanelComponent(8, !!process.env.RUBO_DEBUG);
   const spacer = new Spacer(1);
 
   // Elite TUI additions
@@ -594,7 +595,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
     chatLog.addChild(new Spacer(1));
     chatLog.addChild(
       new Text(
-        theme.muted(`↻ Resumed: ${session.title} · ${count} turn${count === 1 ? '' : 's'}`),
+        theme.muted(`↻ Resumed ${session.id} · ${session.title} · ${count} turn${count === 1 ? '' : 's'}`),
         0,
         0,
       ),
@@ -621,7 +622,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       }
       case 'rules': {
         try {
-          const rulesContent = await readFile(antoinePath('RULES.md'), 'utf-8');
+          const rulesContent = await readFile(ruboPath('RULES.md'), 'utf-8');
           chatLog.addChild(new Spacer(1));
           chatLog.addChild(new Text(theme.muted('Research Rules:'), 0, 0));
           chatLog.addChild(new Text(rulesContent, 0, 0));
@@ -640,7 +641,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
         await agentRunner.runQuery('Show me what you know about me from memory. Use memory_search and memory_get.');
         break;
       case 'heartbeat':
-        await agentRunner.runQuery('Show me my current heartbeat checklist from .antoine/HEARTBEAT.md');
+        await agentRunner.runQuery('Show me my current heartbeat checklist from .rubo/HEARTBEAT.md');
         break;
       case 'history': {
         const messages = modelSelection.inMemoryChatHistory.getMessages();
@@ -675,7 +676,18 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
         break;
       }
       case 'resume': {
-        // Immediately reveal and continue the most recent prior conversation.
+        // `/resume <id>` continues that session (from the CLI or from Telegram);
+        // bare `/resume` continues the most recent prior conversation.
+        if (rest) {
+          const full = await loadSession(rest);
+          if (full) resumeInto(full);
+          else {
+            chatLog.addChild(new Spacer(1));
+            chatLog.addChild(new Text(theme.warning(`No session "${rest}". /sessions lists them.`), 0, 0));
+          }
+          tui.requestRender();
+          break;
+        }
         const sessions = await listSessions();
         const target = sessions.find((s) => !sessionStore || s.id !== sessionStore.id) ?? sessions[0];
         if (!target) {
@@ -1173,7 +1185,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
             const current = sessionStore && s.id === sessionStore.id ? ' (current)' : '';
             return {
               value: s.id,
-              label: `${i + 1}. ${s.title}${current}  ·  ${formatRelativeTime(s.updatedAt)} · ${turns}`,
+              label: `${s.id}  ${s.title}${current}  ·  ${formatRelativeTime(s.updatedAt)} · ${turns}`,
             };
           }),
           (value) => {
@@ -1329,7 +1341,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       );
       showScreenView(
         'Select web search provider',
-        'Antoine tries your preferred provider first and falls back to the others.',
+        'Rubo tries your preferred provider first and falls back to the others.',
         selector,
         'Enter to confirm · esc to exit',
         selector,
@@ -1461,7 +1473,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
     editor.addToHistoryWithTruncation(msg);
   }
 
-  // Resume a prior session at startup if requested via `antoine --resume [id]`.
+  // Resume a prior session at startup if requested via `rubo --resume [id]`.
   if (resumeRequest.resume) {
     const target = resumeRequest.id ? await loadSession(resumeRequest.id) : await latestSession();
     if (target && target.turns.length > 0) {
@@ -1489,7 +1501,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
   // pi-tui's first paint deliberately does NOT clear the screen ("assumes clean
   // screen"), and it leaves its UI on the terminal when a previous run exits.
   // That stranded a stale, empty input box above the welcome banner whenever
-  // Antoine was relaunched in a dirty terminal. Force one clean full redraw
+  // Rubo was relaunched in a dirty terminal. Force one clean full redraw
   // (clears scrollback + screen) so we always start pristine and never duplicate
   // the input box.
   tui.requestRender(true);

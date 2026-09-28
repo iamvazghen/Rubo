@@ -3,31 +3,31 @@ import { existsSync, mkdirSync, writeFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { buildCacheKey, readCache, writeCache } from './cache.js';
-import { antoinePath } from './paths.js';
+import { ruboPath } from './paths.js';
 
 /**
  * Ask the resolver where the cache is rather than assuming.
  *
- * This used to hard-code '.antoine/cache'. antoinePath() prefers ./.antoine when
- * that directory exists and falls back to ~/.antoine when it does not - so on a
- * developer checkout the guess was right, and on a fresh CI checkout (.antoine is
- * gitignored) the test wrote a corrupt entry to ./.antoine/cache while readCache
- * looked in ~/.antoine/cache. The two corrupt-entry cases then failed on every
+ * This used to hard-code '.rubo/cache'. ruboPath() prefers ./.rubo when
+ * that directory exists and falls back to ~/.rubo when it does not - so on a
+ * developer checkout the guess was right, and on a fresh CI checkout (.rubo is
+ * gitignored) the test wrote a corrupt entry to ./.rubo/cache while readCache
+ * looked in ~/.rubo/cache. The two corrupt-entry cases then failed on every
  * push for weeks, in the one environment nobody was watching.
  */
-const TEST_HOME = mkdtempSync(join(tmpdir(), 'antoine-cache-test-'));
+const TEST_HOME = mkdtempSync(join(tmpdir(), 'rubo-cache-test-'));
 
 /**
- * Claim ANTOINE_HOME for the duration of each case, and ask the resolver where
+ * Claim RUBO_HOME for the duration of each case, and ask the resolver where
  * the cache went rather than assuming.
  *
- * Two separate bugs met here. The path was hard-coded to '.antoine/cache', which
+ * Two separate bugs met here. The path was hard-coded to '.rubo/cache', which
  * matched a developer checkout and not a fresh CI one, so these two cases failed
- * on every push for weeks. And other suites set ANTOINE_HOME for their own
+ * on every push for weeks. And other suites set RUBO_HOME for their own
  * scratch state, so a module-load-time reading of it went stale as soon as tests
  * ran together.
  */
-const cacheDir = () => antoinePath('cache');
+const cacheDir = () => ruboPath('cache');
 
 // ---------------------------------------------------------------------------
 // buildCacheKey
@@ -72,14 +72,14 @@ describe('buildCacheKey', () => {
 
 describe('readCache / writeCache', () => {
   beforeEach(() => {
-    process.env.ANTOINE_HOME = TEST_HOME;
+    process.env.RUBO_HOME = TEST_HOME;
     if (existsSync(cacheDir())) {
       rmSync(cacheDir(), { recursive: true });
     }
   });
 
   afterEach(() => {
-    process.env.ANTOINE_HOME = TEST_HOME;
+    process.env.RUBO_HOME = TEST_HOME;
     if (existsSync(cacheDir())) {
       rmSync(cacheDir(), { recursive: true });
     }

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { antoinePath } from '../../utils/paths.js';
+import { ruboPath } from '../../utils/paths.js';
 
 export type SessionEntry = {
   sessionKey: string;
@@ -10,12 +10,14 @@ export type SessionEntry = {
   lastTo?: string;
   lastAccountId?: string;
   lastAgentId?: string;
+  /** The saved conversation (`telegram:…` or `cli:…`) this chat is currently continuing. */
+  activeSessionId?: string;
 };
 
 export type SessionStore = Record<string, SessionEntry>;
 
 export function resolveSessionStorePath(agentId: string): string {
-  const base = process.env.ANTOINE_SESSIONS_DIR ?? antoinePath('sessions');
+  const base = process.env.RUBO_SESSIONS_DIR ?? ruboPath('sessions');
   return join(base, agentId, 'sessions.json');
 }
 
@@ -57,9 +59,19 @@ export function upsertSessionMeta(params: {
     lastTo: params.to,
     lastAccountId: params.accountId,
     lastAgentId: params.agentId,
+    activeSessionId: existing?.activeSessionId,
   };
   store[params.sessionKey] = next;
   saveSessionStore(params.storePath, store);
   return next;
+}
+
+/** Point a chat at the saved conversation it should continue. */
+export function setActiveSession(storePath: string, sessionKey: string, sessionId: string): void {
+  const store = loadSessionStore(storePath);
+  const entry = store[sessionKey];
+  if (!entry) return;
+  store[sessionKey] = { ...entry, activeSessionId: sessionId };
+  saveSessionStore(storePath, store);
 }
 

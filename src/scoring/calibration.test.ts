@@ -11,8 +11,8 @@ import { join } from 'node:path';
  * A synthetic ledger does not shorten the wait, but it does mean the answer will
  * be right when the wait is over.
  */
-const HOME = mkdtempSync(join(tmpdir(), 'antoine-calib-'));
-process.env.ANTOINE_HOME = HOME;
+const HOME = mkdtempSync(join(tmpdir(), 'rubo-calib-'));
+process.env.RUBO_HOME = HOME;
 mkdirSync(join(HOME, 'scores'), { recursive: true });
 
 const { calibration, calibrationProgress } = await import('./grade.js');

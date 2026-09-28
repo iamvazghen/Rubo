@@ -1,7 +1,7 @@
 # Repository Guidelines
 
-- Repo: https://github.com/iamvazghen/antoine
-- Antoine is a CLI-based AI agent for deep financial research, built with TypeScript, `@mariozechner/pi-tui` (terminal UI), and LangChain.
+- Repo: https://github.com/iamvazghen/rubo
+- Rubo is a CLI-based AI agent for deep financial research, built with TypeScript, `@mariozechner/pi-tui` (terminal UI), and LangChain.
 - Reachable two ways: the interactive CLI, and an optional Telegram gateway.
 
 ## Project Structure
@@ -20,17 +20,17 @@
   - Skills: `src/skills/` (SKILL.md-based extensible workflows, e.g. DCF valuation)
   - Utils: `src/utils/` (env, config, caching, token estimation, markdown tables)
   - Evals: `src/evals/` (LangSmith evaluation runner with Ink UI)
-- Config: `.antoine/settings.json` (persisted model/provider selection), `.antoine/gateway.json` (channels)
+- Config: `.rubo/settings.json` (persisted model/provider selection), `.rubo/gateway.json` (channels)
 - Environment: `.env` (API keys; see `env.example`)
-- Global launcher: `antoine` (runs the CLI from any folder); see README "How to Run"
+- Global launcher: `rubo` (runs the CLI from any folder); see README "How to Run"
 - Scripts: `scripts/release.sh`
 
 ## Build, Test, and Development Commands
 
 - Runtime: Bun (primary). Use `bun` for all commands.
 - Install deps: `bun install`
-- Run: `bun run start` or `bun run src/index.tsx`
-- Dev (watch mode): `bun run dev`
+- Run: `npm start` (Node + tsx; Bun on Windows never reports terminal resizes, so the TUI must not run under Bun)
+- Dev (watch mode): `npm run dev`
 - Type-check: `bun run typecheck`
 - Tests: `bun test`
 - Evals: `bun run src/evals/run.ts` (full) or `bun run src/evals/run.ts --sample 10` (sampled)
@@ -75,7 +75,7 @@
 - Gateway entry: `src/gateway/index.ts` (`run` | `login` | `telegram`). Bootstrap: `src/gateway/gateway.ts`.
 - Channels under `src/gateway/channels/`: `telegram/` (Bot API long-polling).
 - Add a channel by implementing `ChannelPlugin` (`channels/types.ts`) and registering a manager in `startGateway`.
-- Config + per-account resolution: `src/gateway/config.ts` (`.antoine/gateway.json`).
+- Config + per-account resolution: `src/gateway/config.ts` (`.rubo/gateway.json`).
 
 ## Skills
 
@@ -120,5 +120,5 @@
 ## Security
 
 - API keys stored in `.env` (gitignored). Users can also enter keys interactively via the CLI.
-- Config stored in `.antoine/settings.json` (gitignored).
+- Config stored in `.rubo/settings.json` (gitignored).
 - Never commit or expose real API keys, tokens, or credentials.

@@ -10,7 +10,7 @@ Rules:
 
 ## Persistent memory (Obsidian vault)
 
-Durable project memory: `C:\Users\iamva\Documents\Obsidian Vault\30-Projects\Active\antoine.md`.
+Durable project memory: `C:\Users\iamva\Documents\Obsidian Vault\30-Projects\Active\rubo.md`.
 
 Context order: graphify query → vault note → raw source. Never grep to orient.
 `/resume` to load state, `/save` to write it back.

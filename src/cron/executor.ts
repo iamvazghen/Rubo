@@ -10,13 +10,13 @@ import { loadGatewayConfig, resolveTelegramAccount } from '../gateway/config.js'
 import { resolveSessionStorePath, loadSessionStore, type SessionEntry } from '../gateway/sessions/store.js';
 import { getSetting } from '../utils/config.js';
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from '../model/llm.js';
-import { antoinePath } from '../utils/paths.js';
+import { ruboPath } from '../utils/paths.js';
 import { saveCronStore } from './store.js';
 import { computeNextRunAtMs } from './schedule.js';
 import type { ActiveHours, CronJob, CronStore } from './types.js';
 
-// ponytail: lazy so $ANTOINE_HOME set after module load still counts.
-const LOG_PATH = () => antoinePath('gateway-debug.log');
+// ponytail: lazy so $RUBO_HOME set after module load still counts.
+const LOG_PATH = () => ruboPath('gateway-debug.log');
 
 function debugLog(msg: string) {
   appendFileSync(LOG_PATH(), `${new Date().toISOString()} ${msg}\n`);

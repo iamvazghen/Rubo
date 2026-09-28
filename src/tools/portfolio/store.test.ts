@@ -8,7 +8,7 @@ describe('PortfolioStore', () => {
   const tmpDirs: string[] = [];
 
   function mkStore(): PortfolioStore {
-    const dir = mkdtempSync(join(tmpdir(), 'antoine-portfolio-'));
+    const dir = mkdtempSync(join(tmpdir(), 'rubo-portfolio-'));
     tmpDirs.push(dir);
     return new PortfolioStore(dir);
   }

@@ -9,7 +9,7 @@ import { fetchJson } from './utils.js';
  *   - Macroeconomic indicators → World Bank Open Data
  *   - US macro time series     → FRED (St. Louis Fed) — gated by FRED_API_KEY
  *
- * These broaden Antoine's coverage beyond the equities/crypto data provided by
+ * These broaden Rubo's coverage beyond the equities/crypto data provided by
  * Financial Datasets. FX and World Bank need no key; FRED is opt-in via .env.
  */
 

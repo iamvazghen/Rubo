@@ -7,7 +7,7 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { antoinePath } from './paths.js';
+import { ruboPath } from './paths.js';
 
 /** Maximum characters for a single tool result in context. */
 export const MAX_TOOL_RESULT_CHARS = 50_000;
@@ -15,8 +15,8 @@ export const MAX_TOOL_RESULT_CHARS = 50_000;
 /** Characters to include in the preview when a result is persisted. */
 export const PREVIEW_CHARS = 2_000;
 
-// ponytail: lazy so $ANTOINE_HOME set after module load still counts.
-const RESULTS_DIR = () => antoinePath('tool-results');
+// ponytail: lazy so $RUBO_HOME set after module load still counts.
+const RESULTS_DIR = () => ruboPath('tool-results');
 
 /**
  * Persist a large tool result to disk and return a compact preview.

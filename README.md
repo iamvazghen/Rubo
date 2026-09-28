@@ -1,6 +1,6 @@
-# Antoine
+# Rubo
 
-**Antoine** is a self-hosted financial-research agent. It lives in your terminal and your Telegram, and it does the work of a junior analyst: pulling live data across **84 tools**, citing every claim, running a multi-agent debate on high-conviction trades, and remembering your portfolio between sessions.
+**Rubo** is a self-hosted financial-research agent. It lives in your terminal and your Telegram, and it does the work of a junior analyst: pulling live data across **84 tools**, citing every claim, running a multi-agent debate on high-conviction trades, and remembering your portfolio between sessions.
 
 What separates it from a chatbot with a stock API is the **grading engine**: every company gets a deterministic **0-100 score on two horizons** — 1-3 years and 20+ years — computed in code from a fixed factor set, so the same inputs give the same number in March and in September. Grades are written to a ledger with the price at the time, which turns a stream of opinions into a track record you can check.
 
@@ -36,14 +36,14 @@ Ships configured for **MiniMax M2.5**, and wired to 10 LLM providers (OpenAI · 
 
 ## What it does
 
-Antoine takes a question like *"is NVDA cheap relative to peers given the AI capex cycle?"* and runs an end-to-end research workflow:
+Rubo takes a question like *"is NVDA cheap relative to peers given the AI capex cycle?"* and runs an end-to-end research workflow:
 
 1. **Plans** — picks the right tools (equity quotes? financials? news? filings?) and issues them in parallel where independent.
 2. **Sources** — pulls from **84 financial tools** covering US equities, global equities across ~66 exchanges, crypto, FX, commodities, macro (FRED, World Bank, ECB, BIS), real estate, SEC filings, news from 4 providers, and on-chain crypto.
 3. **Cross-checks** — when providers disagree, it surfaces both. Every data point carries a freshness stamp (`Polygon · 14:32 UTC`) and a numbered citation.
 4. **Argues** — for any high-conviction trade it spawns a 4-specialist debate (bull / bear / quant / macro) and a judge subagent that synthesizes a structured `Decision · Conviction · Time horizon`.
 5. **Grades** — scores the company 0-100 on both a 1-3 year and a 20+ year horizon from a fixed, weighted factor set, and records the grade so later runs report what *changed*.
-6. **Remembers** — your portfolio, risk tolerance, prior trades, and stated rules live in `.antoine/` and are auto-injected into every system prompt.
+6. **Remembers** — your portfolio, risk tolerance, prior trades, and stated rules live in `.rubo/` and are auto-injected into every system prompt.
 
 The output is **opinionated, source-cited, falsifiable** — it leads with the answer, attaches citations to every claim, and includes bear-case risks for any recommendation. The agent is **explicitly permitted to disagree with the user's priors** and to call out weak theses.
 
@@ -102,7 +102,7 @@ investment_report { horizon: "long", top_n: 10 }
 score_history { action: "calibration", horizon: "long" }
 ```
 
-Grades append to `<antoine>/scores/<TICKER>.jsonl` with the price at grade time.
+Grades append to `<rubo>/scores/<TICKER>.jsonl` with the price at grade time.
 That ledger is what makes the periodic review a **diff** instead of a fresh
 opinion, and what lets `calibration` eventually say whether the scoring works.
 
@@ -116,7 +116,7 @@ and the result says so; one without a US line names the ADR to use instead.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ Antoine CLI/Telegram                                              │
+│ Rubo CLI/Telegram                                              │
 │   • pi-tui terminal UI (themeable, source chips, watchlist,        │
 │     command palette, status bar, cost-cap overlay, diff viewer)    │
 │   • Slash commands (/model /theme /cost /watch /run_debate …)       │
@@ -249,7 +249,7 @@ When the user enables another channel, set `channel` in the `AgentConfig` — th
 
 ## Memory + portfolio
 
-Three persistent stores under `.antoine/`:
+Three persistent stores under `.rubo/`:
 
 | File | Format | Purpose |
 |---|---|---|
@@ -273,8 +273,8 @@ The **portfolio store** tracks thesis + conviction + target + stop per position;
 ## Install
 
 ```bash
-git clone https://github.com/iamvazghen/antoine.git
-cd antoine
+git clone https://github.com/iamvazghen/rubo.git
+cd rubo
 bun install
 cp env.example .env
 $EDITOR .env   # fill in your keys
@@ -287,10 +287,30 @@ The first run will prompt for any missing keys.
 ## Run
 
 ```bash
-bun start                 # interactive CLI
-bun dev                   # watch mode for development
-bun run src/index.tsx     # equivalent to bun start
+npm start                 # interactive CLI (Node)
+npm run dev               # watch mode for development
+rubo                      # same, from any folder, once scripts/bin is on PATH
 ```
+
+The interactive CLI runs on Node, not Bun: Bun on Windows never reports a terminal resize, so the layout could not follow the window. Tests still run with `bun test`.
+
+### Sessions
+
+Every conversation is saved and can be continued later, from the CLI or from Telegram. A session id says where it started and when, in local time (`timezone` setting, default Europe/Berlin):
+
+```
+cli:2026-09-28_14-05-12
+telegram:2026-09-28_18-40-03
+```
+
+| Where | Command | What it does |
+|---|---|---|
+| CLI | `rubo --resume [id]` | Start by continuing a session (the latest if no id) |
+| CLI | `/sessions`, `/resume [id]` | Pick a session, or continue one by id |
+| Telegram | `/sessions` | List saved sessions from both surfaces |
+| Telegram | `/resume <id>`, `/new`, `/session` | Continue one, start a new one, show the current one |
+
+Telegram sessions are saved on the machine that runs the gateway (the VPS). `rubo pull` copies them down so the CLI can resume them; `rubo push` sends CLI sessions up so Telegram can.
 
 The CLI launches a TUI with a banner, status bar (model · tokens · cost · iter · t/s), command palette (`Ctrl+P`), watchlist sidebar, and input area. Slash commands are auto-completed.
 
@@ -305,7 +325,7 @@ The CLI launches a TUI with a banner, status bar (model · tokens · cost · ite
 | `/theme` | Switch color theme (emerald · sapphire · amethyst · obsidian) |
 | `/rules` | Show research rules |
 | `/clear` | Clear the conversation |
-| `/memory` | Show what Antoine remembers about you |
+| `/memory` | Show what Rubo remembers about you |
 | `/history` | Show recent conversation summaries |
 | `/sessions` / `/resume` | List / resume saved sessions |
 | `/palette` | Open the fuzzy command palette (also `Ctrl+P`) |
@@ -322,7 +342,7 @@ Keyboard shortcuts: `Esc` interrupt · `Ctrl+C` exit · `Ctrl+P` command palette
 
 ## Evaluate
 
-Antoine ships with a finance-specific eval suite (236 questions, LangSmith-backed):
+Rubo ships with a finance-specific eval suite (236 questions, LangSmith-backed):
 
 ```bash
 bun run src/evals/run.ts            # full suite
@@ -335,12 +355,12 @@ The eval uses an LLM-as-judge to score correctness against ground-truth answers 
 
 ## Debug
 
-Every query creates a JSONL file in `.antoine/scratchpad/` with:
+Every query creates a JSONL file in `.rubo/scratchpad/` with:
 - The original query
 - Every tool call (args + raw result + LLM summary)
 - The agent's reasoning chain
 
-This makes it easy to inspect exactly what data the agent pulled and how it interpreted each result. Set `ANTOINE_DEBUG=1` to also surface a live log panel in the TUI.
+This makes it easy to inspect exactly what data the agent pulled and how it interpreted each result. Set `RUBO_DEBUG=1` to also surface a live log panel in the TUI.
 
 ---
 
@@ -365,25 +385,25 @@ terminal.
 ### Linux (systemd)
 
 ```bash
-git clone https://github.com/iamvazghen/antoine.git ~/antoine && cd ~/antoine
+git clone https://github.com/iamvazghen/rubo.git ~/rubo && cd ~/rubo
 npm install
 cp env.example .env && $EDITOR .env       # keys
-mkdir -p ~/.antoine                        # state: memory, portfolio, scores, cron
+mkdir -p ~/.rubo                        # state: memory, portfolio, scores, cron
 ```
 
-`~/.config/systemd/user/antoine-gateway.service`:
+`~/.config/systemd/user/rubo-gateway.service`:
 
 ```ini
 [Unit]
-Description=Antoine gateway (Telegram + cron)
+Description=Rubo gateway (Telegram + cron)
 After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/antoine
-Environment=ANTOINE_HOME=%h/.antoine
+WorkingDirectory=%h/rubo
+Environment=RUBO_HOME=%h/.rubo
 Environment=NODE_OPTIONS=--max-old-space-size=1024
-EnvironmentFile=%h/antoine/.env
+EnvironmentFile=%h/rubo/.env
 ExecStart=/usr/bin/npx tsx src/gateway/index.ts run
 Restart=always
 RestartSec=10
@@ -394,47 +414,47 @@ WantedBy=default.target
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now antoine-gateway
+systemctl --user enable --now rubo-gateway
 loginctl enable-linger $USER      # survive logout / reboot
-journalctl --user -u antoine-gateway -f
+journalctl --user -u rubo-gateway -f
 ```
 
-`ANTOINE_HOME` is what makes this safe: state resolves to one absolute
+`RUBO_HOME` is what makes this safe: state resolves to one absolute
 directory regardless of the working directory the service starts in.
 
 ### A launcher on PATH
 
-Copy `scripts/bin/antoine` (bash) and `scripts/bin/antoine.cmd` (PowerShell/cmd)
-onto your `PATH` and set `ANTOINE_REPO` to the checkout. Both give the same
+Copy `scripts/bin/rubo` (bash) and `scripts/bin/rubo.cmd` (PowerShell/cmd)
+onto your `PATH` and set `RUBO_REPO` to the checkout. Both give the same
 subcommands:
 
 ```
-antoine                 # interactive UI (needs a real terminal)
-antoine health          # provider health sweep
-antoine test            # test suite
-antoine gateway         # Telegram + cron locally
-antoine logs            # tail the VPS gateway log
-antoine vps restart     # control the VPS service
-antoine pull / push     # sync memory + score ledger with the VPS
+rubo                 # interactive UI (needs a real terminal)
+rubo health          # provider health sweep
+rubo test            # test suite
+rubo gateway         # Telegram + cron locally
+rubo logs            # tail the VPS gateway log
+rubo vps restart     # control the VPS service
+rubo pull / push     # sync memory + score ledger with the VPS
 ```
 
-Two files rather than one because PowerShell resolves a bare `antoine` to the
+Two files rather than one because PowerShell resolves a bare `rubo` to the
 `.cmd` through PATHEXT, while bash only matches an exact filename — without the
-extensionless twin, `antoine` is "command not found" in Git Bash.
+extensionless twin, `rubo` is "command not found" in Git Bash.
 
 ### The Windows shim, inline
 
-Drop `antoine.cmd` somewhere on `PATH`:
+Drop `rubo.cmd` somewhere on `PATH`:
 
 ```bat
 @echo off
 setlocal
-if not defined ANTOINE_REPO set "ANTOINE_REPO=C:\path\to\antoine"
-if not defined ANTOINE_HOME set "ANTOINE_HOME=%ANTOINE_REPO%\.antoine"
-pushd "%ANTOINE_REPO%"
+if not defined RUBO_REPO set "RUBO_REPO=C:\path\to\rubo"
+if not defined RUBO_HOME set "RUBO_HOME=%RUBO_REPO%\.rubo"
+pushd "%RUBO_REPO%"
 if /i "%~1"=="gateway" (shift & call bun run gateway & goto :done)
 if /i "%~1"=="health"  (call bun run health & goto :done)
-call bun run src/index.tsx %*
+call node --import tsx src/index.tsx %*
 :done
 set "EXITCODE=%ERRORLEVEL%"
 popd
@@ -444,9 +464,9 @@ exit /b %EXITCODE%
 Then from any directory:
 
 ```powershell
-antoine                 # interactive CLI
-antoine health          # provider health sweep
-antoine gateway         # Telegram + cron locally
+rubo                 # interactive CLI
+rubo health          # provider health sweep
+rubo gateway         # Telegram + cron locally
 ```
 
 ---
@@ -544,7 +564,7 @@ See `env.example` for the full list with keys. **Paid providers** (Bloomberg, Tr
 
 ## Third-party data attribution + licenses
 
-This project integrates with the following third-party data providers. Each provider retains its own terms of service; the data they return is owned by them, not by Antoine. Use of each provider is governed by their respective license/terms:
+This project integrates with the following third-party data providers. Each provider retains its own terms of service; the data they return is owned by them, not by Rubo. Use of each provider is governed by their respective license/terms:
 
 | Provider | License / Terms |
 |---|---|
@@ -585,7 +605,7 @@ Open-source dependencies are listed in `package.json` with their respective lice
 
 ## License
 
-[MIT](LICENSE) © 2024–2026 Antoine contributors.
+[MIT](LICENSE) © 2024–2026 Rubo contributors.
 
 You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, subject to the MIT License terms. **Data returned by the third-party providers above is not covered by the MIT license** — it remains governed by each provider's own terms.
 

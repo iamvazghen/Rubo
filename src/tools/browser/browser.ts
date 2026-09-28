@@ -143,7 +143,7 @@ To press Enter:
  * the renderer sandbox access to chrome.exe, which is wrong and is why it went
  * unfixed - the gateway and the VPS run under tsx/Node and the tool works there.
  *
- * ponytail: refuse in 0ms instead of hanging the turn. ANTOINE_BROWSER_FORCE=1
+ * ponytail: refuse in 0ms instead of hanging the turn. RUBO_BROWSER_FORCE=1
  * overrides it, for when Bun gains the missing pipe.
  */
 export function browserLaunchBlockReason(
@@ -153,8 +153,8 @@ export function browserLaunchBlockReason(
   if (!runtime.isBun || runtime.platform !== 'win32') return null;
   return (
     'cannot launch under Bun on Windows: Playwright needs an extra stdio pipe that Bun does not ' +
-    'provide there, so the launch never completes. Use web_fetch for page content, or run Antoine ' +
-    'under Node (`npx tsx src/index.tsx`). Set ANTOINE_BROWSER_FORCE=1 to attempt it anyway.'
+    'provide there, so the launch never completes. Use web_fetch for page content, or run Rubo ' +
+    'under Node (`npx tsx src/index.tsx`). Set RUBO_BROWSER_FORCE=1 to attempt it anyway.'
   );
 }
 
@@ -163,8 +163,8 @@ export function browserLaunchBlockReason(
  *
  * Headless by default. The comment here used to say headless while the code
  * passed `headless: false`, which opens a visible window - it timed out after
- * 180s locally and cannot work at all on the VPS, where Antoine actually runs
- * and there is no display. Set ANTOINE_BROWSER_HEADFUL=1 to watch it work
+ * 180s locally and cannot work at all on the VPS, where Rubo actually runs
+ * and there is no display. Set RUBO_BROWSER_HEADFUL=1 to watch it work
  * while debugging on a desktop. Verified headless on the VPS (Example Domain
  * in 718ms).
  */
@@ -173,11 +173,11 @@ async function ensureBrowser(): Promise<Page> {
     const blocked = browserLaunchBlockReason({
       isBun: typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined',
       platform: process.platform,
-      force: process.env.ANTOINE_BROWSER_FORCE === '1',
+      force: process.env.RUBO_BROWSER_FORCE === '1',
     });
     if (blocked) throw new Error(blocked);
 
-    const headful = process.env.ANTOINE_BROWSER_HEADFUL === '1';
+    const headful = process.env.RUBO_BROWSER_HEADFUL === '1';
     browser = await chromium.launch({ headless: !headful });
   }
   if (!page) {

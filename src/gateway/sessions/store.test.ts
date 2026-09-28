@@ -10,8 +10,8 @@ import {
 
 describe('session store', () => {
   test('creates and updates session metadata', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'antoine-sessions-'));
-    process.env.ANTOINE_SESSIONS_DIR = dir;
+    const dir = mkdtempSync(join(tmpdir(), 'rubo-sessions-'));
+    process.env.RUBO_SESSIONS_DIR = dir;
     try {
       const storePath = resolveSessionStorePath('agentA');
       upsertSessionMeta({
@@ -28,7 +28,7 @@ describe('session store', () => {
       expect(entry.lastAgentId).toBe('agentA');
       expect(entry.lastChannel).toBe('telegram');
     } finally {
-      delete process.env.ANTOINE_SESSIONS_DIR;
+      delete process.env.RUBO_SESSIONS_DIR;
       rmSync(dir, { recursive: true, force: true });
     }
   });

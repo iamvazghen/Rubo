@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# POSIX twin of rubo.cmd, for Git Bash / WSL / MSYS.
+#
+# PowerShell and cmd resolve a bare `rubo` to rubo.cmd through PATHEXT.
+# Bash has no such mechanism and only runs an exact filename match, so without
+# this file `rubo` is "command not found" in Git Bash even though the shim
+# is right there on PATH.
+set -euo pipefail
+
+: "${RUBO_REPO:=/c/Users/iamva/dexter}"
+: "${RUBO_VPS:=openclaw@100.107.141.83}"
+# The VPS still runs the pre-rename names (unit antoine-gateway, state ~/.antoine).
+# Point these at the new names once the server itself has been migrated.
+: "${RUBO_VPS_HOME:=~/.antoine}"
+: "${RUBO_VPS_UNIT:=antoine-gateway}"
+
+if [ ! -f "$RUBO_REPO/package.json" ]; then
+  echo "[rubo] No checkout at $RUBO_REPO" >&2
+  echo "[rubo] Set RUBO_REPO to the repository path and try again." >&2
+  exit 1
+fi
+
+# Pin state to the checkout so memory, portfolio, scores and cron jobs are the
+# same set regardless of the directory this was launched from.
+: "${RUBO_HOME:=$RUBO_REPO/.rubo}"
+export RUBO_HOME
+
+cd "$RUBO_REPO"
+
+case "${1:-}" in
+  gateway)
+    # Telegram + scheduled reviews. The VPS owns this in normal operation;
+    # running it here too would make two processes poll the same bot token.
+    shift
+    exec bun run gateway "$@"
+    ;;
+  health)
+    exec bun run health
+    ;;
+  test)
+    exec bun test
+    ;;
+  pull)
+    # The VPS is authoritative: Telegram conversations and the scheduled
+    # reviews all write there.
+    echo "[rubo] pulling memory, scores and sessions from $RUBO_VPS"
+    scp -q "$RUBO_VPS:$RUBO_VPS_HOME/memory/MEMORY.md" "$RUBO_HOME/memory/MEMORY.md"
+    scp -qr "$RUBO_VPS:$RUBO_VPS_HOME/scores" "$RUBO_HOME/"
+    # Telegram sessions live on the VPS; copy them so `/resume telegram:...` works here.
+    mkdir -p "$RUBO_HOME/sessions"
+    scp -q "$RUBO_VPS:$RUBO_VPS_HOME/sessions/*_*.json" "$RUBO_HOME/sessions/" 2>/dev/null || echo "[rubo] no sessions on the VPS yet"
+    echo "[rubo] done"
+    ;;
+  push)
+    echo "[rubo] pushing local memory and sessions to $RUBO_VPS"
+    scp -q "$RUBO_HOME/memory/MEMORY.md" "$RUBO_VPS:$RUBO_VPS_HOME/memory/MEMORY.md"
+    # CLI sessions, so Telegram can `/resume cli:...`. A session edited on both
+    # sides since the last sync keeps the copy pushed last.
+    ssh "$RUBO_VPS" "mkdir -p $RUBO_VPS_HOME/sessions"
+    scp -q "$RUBO_HOME"/sessions/*_*.json "$RUBO_VPS:$RUBO_VPS_HOME/sessions/" 2>/dev/null || echo "[rubo] no local sessions to push"
+    echo "[rubo] done - restart the gateway there if it should pick it up now"
+    ;;
+  vps)
+    ssh "$RUBO_VPS" "systemctl --user ${2:-status} $RUBO_VPS_UNIT; systemctl --user is-active $RUBO_VPS_UNIT"
+    ;;
+  logs)
+    ssh "$RUBO_VPS" "tail -n 40 $RUBO_VPS_HOME/gateway.log"
+    ;;
+  *)
+    # The interactive TUI needs a real terminal. Refuse clearly rather than
+    # hanging forever on a pipe, which is what happens otherwise.
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+      echo "[rubo] The interactive UI needs a terminal (stdin/stdout are not a TTY here)." >&2
+      echo "[rubo] Run it from Windows Terminal, PowerShell or a real shell." >&2
+      echo "[rubo] Non-interactive subcommands that do work: health, test, pull, push, vps, logs" >&2
+      exit 1
+    fi
+    # Node, not Bun: Bun on Windows never reports terminal resizes.
+    exec node --import tsx src/index.tsx "$@"
+    ;;
+esac

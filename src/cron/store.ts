@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { antoinePath } from '../utils/paths.js';
+import { ruboPath } from '../utils/paths.js';
 import type { CronStore } from './types.js';
 
-// ponytail: lazy so $ANTOINE_HOME set after module load still counts.
-const CRON_STORE_PATH = () => antoinePath('cron', 'jobs.json');
+// ponytail: lazy so $RUBO_HOME set after module load still counts.
+const CRON_STORE_PATH = () => ruboPath('cron', 'jobs.json');
 
 const EMPTY_STORE: CronStore = { version: 1, jobs: [] };
 

@@ -53,7 +53,7 @@ export const readFileTool = new DynamicStructuredTool({
     await access(absolutePath, constants.R_OK);
 
     // Reading a directory throws a cryptic EISDIR. Return a useful listing instead
-    // so the agent can pick a real file (e.g. .antoine/memory holds MEMORY.md + logs).
+    // so the agent can pick a real file (e.g. .rubo/memory holds MEMORY.md + logs).
     const info = await stat(absolutePath);
     if (info.isDirectory()) {
       const entries = await readdir(absolutePath, { withFileTypes: true });

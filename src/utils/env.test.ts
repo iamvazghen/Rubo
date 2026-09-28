@@ -8,7 +8,7 @@ import { checkApiKeyExists } from './env.js';
  * chain spent a call on a guaranteed 401 before moving on.
  */
 describe('checkApiKeyExists', () => {
-  const NAME = 'ANTOINE_TEST_KEY_ONLY';
+  const NAME = 'RUBO_TEST_KEY_ONLY';
   afterEach(() => {
     delete process.env[NAME];
   });

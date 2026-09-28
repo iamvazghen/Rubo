@@ -1,5 +1,5 @@
 /**
- * LangSmith Evaluation Runner for Antoine
+ * LangSmith Evaluation Runner for Rubo
  * 
  * Usage:
  *   bun run src/evals/run.ts              # Run on all questions
@@ -137,7 +137,7 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 // ============================================================================
-// Target function - wraps Antoine agent
+// Target function - wraps Rubo agent
 // ============================================================================
 
 async function target(inputs: { question: string }): Promise<{ answer: string }> {
@@ -232,8 +232,8 @@ function createEvaluationRunner(sampleSize?: number) {
 
     // Create a unique dataset name for this run (sampling creates different datasets)
     const datasetName = sampleSize 
-      ? `antoine-finance-eval-sample-${sampleSize}-${Date.now()}`
-      : 'antoine-finance-eval';
+      ? `rubo-finance-eval-sample-${sampleSize}-${Date.now()}`
+      : 'rubo-finance-eval';
 
     // Yield init event
     yield {
@@ -270,7 +270,7 @@ function createEvaluationRunner(sampleSize?: number) {
     }
 
     // Generate experiment name for tracking
-    const experimentName = `antoine-eval-${Date.now().toString(36)}`;
+    const experimentName = `rubo-eval-${Date.now().toString(36)}`;
 
     // Run evaluation manually - process each example one by one
     for (const example of examples) {
@@ -296,7 +296,7 @@ function createEvaluationRunner(sampleSize?: number) {
 
       // Log to LangSmith for tracking
       await client.createRun({
-        name: 'antoine-eval-run',
+        name: 'rubo-eval-run',
         run_type: 'chain',
         inputs: example.inputs,
         outputs,

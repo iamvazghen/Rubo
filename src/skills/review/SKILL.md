@@ -69,7 +69,7 @@ Your holdings
 [Anything that could not be graded, and why.]
 ```
 
-Keep it short. The full markdown report is written to `<antoine>/reports/` and
+Keep it short. The full markdown report is written to `<rubo>/reports/` and
 the user can read the detail there.
 
 ## Scheduling it

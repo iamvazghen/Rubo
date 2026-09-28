@@ -43,9 +43,9 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   // --- Session
   { name: 'clear', description: 'Clear the conversation and start fresh', category: 'Session' },
   { name: 'history', description: 'Show recent conversation summaries', category: 'Session' },
-  { name: 'sessions', description: 'List saved sessions you can resume', category: 'Session' },
-  { name: 'resume', description: 'Resume your most recent previous session', category: 'Session' },
-  { name: 'memory', description: 'Show what Antoine remembers about you', category: 'Session' },
+  { name: 'sessions', description: 'List saved CLI and Telegram sessions you can resume', category: 'Session' },
+  { name: 'resume', description: 'Resume a session: /resume telegram:2026-09-28_14-05-12, or the latest', category: 'Session' },
+  { name: 'memory', description: 'Show what Rubo remembers about you', category: 'Session' },
   { name: 'rules', description: 'Show your research rules', category: 'Session' },
   { name: 'heartbeat', description: 'Show your heartbeat monitoring checklist', category: 'Session' },
 
@@ -93,7 +93,7 @@ export const KEY_BINDINGS: KeyBinding[] = [
   { keys: 'enter', description: 'Send the current message' },
   { keys: 'esc', description: 'Interrupt the running query, or clear the input' },
   { keys: 'ctrl+p', description: 'Command palette — fuzzy search commands, sessions and tickers' },
-  { keys: 'ctrl+c', description: 'Exit Antoine' },
+  { keys: 'ctrl+c', description: 'Exit Rubo' },
   { keys: '↑ / ↓', description: 'Walk back through input history' },
 ];
 

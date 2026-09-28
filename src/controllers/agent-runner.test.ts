@@ -37,7 +37,7 @@ describe('AgentRunnerController', () => {
           // Capture the approval request function from config
           const requestApproval = this.config.requestToolApproval;
           if (requestApproval) {
-            const promise = requestApproval({ tool: 'write_file', args: { path: '.antoine/RULES.md', content: 'test' } });
+            const promise = requestApproval({ tool: 'write_file', args: { path: '.rubo/RULES.md', content: 'test' } });
             await promise;
           }
 
@@ -88,7 +88,7 @@ describe('AgentRunnerController', () => {
       expect(controller.pendingApproval).not.toBeNull();
       expect(controller.pendingApproval?.tool).toBe('write_file');
       expect(controller.pendingApproval?.args).toMatchObject({
-        path: '.antoine/RULES.md',
+        path: '.rubo/RULES.md',
         content: 'test',
       });
 

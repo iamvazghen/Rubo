@@ -29,6 +29,21 @@ function getSession(sessionKey: string, model: string): SessionState {
   return created;
 }
 
+/** Whether this process already holds the conversation for a chat in memory. */
+export function hasLiveSession(sessionKey: string): boolean {
+  return sessions.has(sessionKey);
+}
+
+/**
+ * Replace a chat's in-memory conversation with saved turns: used after a
+ * gateway restart (memory is empty, the file is not) and when the user
+ * switches conversation with /new or /resume.
+ */
+export function seedSession(sessionKey: string, model: string, turns: { query: string; answer: string }[]): void {
+  sessions.delete(sessionKey);
+  getSession(sessionKey, model).history.loadTurns(turns);
+}
+
 /**
  * Check whether an agent is currently running for a given session.
  * Used by the gateway to decide whether to enqueue or start a new turn.

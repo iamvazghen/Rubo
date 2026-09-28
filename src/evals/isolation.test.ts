@@ -2,25 +2,25 @@ import { describe, test, expect, afterAll } from 'bun:test';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getAntoineDir, antoinePath } from '../utils/paths.js';
+import { getRuboDir, ruboPath } from '../utils/paths.js';
 
 /**
- * State-writing modules must follow ANTOINE_HOME, not a copy of it taken at
+ * State-writing modules must follow RUBO_HOME, not a copy of it taken at
  * import time.
  *
  * The behavioural suite wrote a real position into the real portfolio twice
  * before this was pinned down. The first cause was a path frozen at module load;
  * the second was subtler — ES `import` statements are hoisted and evaluated
- * before any top-level code, so setting ANTOINE_HOME at the top of a file still
+ * before any top-level code, so setting RUBO_HOME at the top of a file still
  * runs *after* every module it imports has already chosen a directory.
  *
  * A test that only checks its own scratch directory cannot catch either, because
  * the damage lands somewhere else entirely.
  */
-const SCRATCH = mkdtempSync(join(tmpdir(), 'antoine-isolation-'));
+const SCRATCH = mkdtempSync(join(tmpdir(), 'rubo-isolation-'));
 
 afterAll(() => {
-  delete process.env.ANTOINE_HOME;
+  delete process.env.RUBO_HOME;
   try {
     rmSync(SCRATCH, { recursive: true, force: true });
   } catch {
@@ -29,16 +29,16 @@ afterAll(() => {
 });
 
 describe('state directory isolation', () => {
-  test('antoinePath follows a change to ANTOINE_HOME', () => {
-    const before = getAntoineDir();
-    process.env.ANTOINE_HOME = SCRATCH;
-    expect(getAntoineDir()).toBe(SCRATCH);
-    expect(antoinePath('cache')).toBe(join(SCRATCH, 'cache'));
-    expect(getAntoineDir()).not.toBe(before);
+  test('ruboPath follows a change to RUBO_HOME', () => {
+    const before = getRuboDir();
+    process.env.RUBO_HOME = SCRATCH;
+    expect(getRuboDir()).toBe(SCRATCH);
+    expect(ruboPath('cache')).toBe(join(SCRATCH, 'cache'));
+    expect(getRuboDir()).not.toBe(before);
   });
 
-  test('the portfolio store writes wherever ANTOINE_HOME points now', async () => {
-    process.env.ANTOINE_HOME = SCRATCH;
+  test('the portfolio store writes wherever RUBO_HOME points now', async () => {
+    process.env.RUBO_HOME = SCRATCH;
     const { PortfolioStore } = await import('../tools/portfolio/store.js');
 
     // A store built before the change must still honour the change: the tools
@@ -52,7 +52,7 @@ describe('state directory isolation', () => {
   });
 
   test('an explicit base directory still wins', async () => {
-    const explicit = mkdtempSync(join(tmpdir(), 'antoine-explicit-'));
+    const explicit = mkdtempSync(join(tmpdir(), 'rubo-explicit-'));
     const { PortfolioStore } = await import('../tools/portfolio/store.js');
     new PortfolioStore(explicit).update((p) => ({ ...p, total_capital_usd: 99 }));
     expect(existsSync(join(explicit, 'portfolio.json'))).toBe(true);

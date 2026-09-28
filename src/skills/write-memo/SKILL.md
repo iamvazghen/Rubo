@@ -1,6 +1,6 @@
 ---
 name: write-memo
-description: Drafts a professional investment memo (HTML output) for a long or short equity idea, structured the way a hedge fund analyst would present a thesis to a PM. Triggers when the user asks to "write a memo", "draft an investment memo", "write up a thesis", "pitch this stock", "memo on [ticker]", "long writeup", "short writeup", or similar. Produces a 1-page HTML file at .antoine/memos/.
+description: Drafts a professional investment memo (HTML output) for a long or short equity idea, structured the way a hedge fund analyst would present a thesis to a PM. Triggers when the user asks to "write a memo", "draft an investment memo", "write up a thesis", "pitch this stock", "memo on [ticker]", "long writeup", "short writeup", or similar. Produces a 1-page HTML file at .rubo/memos/.
 ---
 
 # Write Investment Memo Skill
@@ -18,7 +18,7 @@ Investment Memo Progress:
 - [ ] Step 4: Optional DCF anchor for base case
 - [ ] Step 5: Draft memo content (fill all slots)
 - [ ] Step 6: Self-critique pass
-- [ ] Step 7: Render HTML to .antoine/memos/
+- [ ] Step 7: Render HTML to .rubo/memos/
 - [ ] Step 8: Report header summary + file path
 ```
 
@@ -157,12 +157,12 @@ Before rendering, verify every check. If any fail, revise the relevant section b
 2. Replace every `{{slot}}` placeholder with the content you drafted
 3. Set `{{date}}` to today's date in YYYY-MM-DD format
 4. Set `{{analyst}}` from memory if known, otherwise blank
-5. Write to `.antoine/memos/[TICKER]_[DIRECTION]_[YYYY-MM-DD].html` via `write_file`
+5. Write to `.rubo/memos/[TICKER]_[DIRECTION]_[YYYY-MM-DD].html` via `write_file`
    - Direction is `LONG` or `SHORT` (uppercase)
-   - Example: `.antoine/memos/NFLX_LONG_2026-05-24.html`
+   - Example: `.rubo/memos/NFLX_LONG_2026-05-24.html`
 6. **Only** write a `.md` source file if the user explicitly requested one
 
-The path uses forward slashes. The `write_file` tool will create the `.antoine/memos/` directory if it does not exist.
+The path uses forward slashes. The `write_file` tool will create the `.rubo/memos/` directory if it does not exist.
 
 ## Step 8: Report to Chat
 
@@ -171,8 +171,8 @@ Final chat response should be exactly this format and nothing more:
 ```
 [TICKER] · [LONG/SHORT] · Target $X (+Y% / -Y%) · Asymmetry [N.Nx] · [Conviction]
 
-Memo saved to .antoine/memos/[FILENAME].html
-Open with: open .antoine/memos/[FILENAME].html
+Memo saved to .rubo/memos/[FILENAME].html
+Open with: open .rubo/memos/[FILENAME].html
 ```
 
 Do not paste the full memo content into the chat. The file is the deliverable. The chat output is a scannable header.
