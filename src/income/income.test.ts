@@ -274,3 +274,26 @@ describe('income calendar and reminders', () => {
     expect(refresh.zonedIso('2026-12-01', 10)).toBe('2026-12-01T09:00:00.000Z');
   });
 });
+
+describe('changing the base currency', () => {
+  test('recorded amounts are converted at the current rate; with no rate nothing changes', async () => {
+    const { store } = await mods();
+    const { runFinanceCommand } = await import('../commands/finance.js');
+    const { baseCurrency } = await import('../utils/locale.js');
+    const entryTax = { gross: 110, withholding: 16.5, received: 93.5, residence_tax: 0, residence_tax_label: 'tax', residence_tax_settled: 'not_modelled' as const, allowance_used: 0, net: 93.5, withholding_rate: 0.15, notes: [] };
+    store.incomeStore.saveLedger({ reserve: 110, allowance_used: { ibkr: { year: 2026, amount: 50 } }, entries: [
+      { eventId: 'KO:x', ticker: 'KO', confirmedAt: 'x', net: 93.5, tax: entryTax, allocations: [{ action: 'reinvest', pct: 100, amount: 93.5, unit_price: 70, units: 1.3357 }] },
+    ] });
+
+    const reply = await runFinanceCommand('setup', 'currency eur', market);
+    expect(baseCurrency()).toBe('EUR');
+    expect(reply).toContain('reserve now €100.00');
+    const l = store.incomeStore.ledger();
+    expect(l.entries[0]!.net).toBe(85);
+    expect(l.entries[0]!.allocations[0]).toMatchObject({ amount: 85, unit_price: 63.64, units: 1.3357 });
+    expect(l.allowance_used.ibkr!.amount).toBe(50); // kept in the jurisdiction's currency
+
+    expect(await runFinanceCommand('setup', 'currency JPY', market)).toContain('nothing was changed');
+    expect(baseCurrency()).toBe('EUR');
+  });
+});

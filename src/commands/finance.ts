@@ -5,11 +5,12 @@ import { cancelImport, confirmImport, describePreview, previewImport } from '../
 import { runRebalanceCommand } from '../rebalance/check.js';
 import { accountId, BROKERS } from '../income/brokers.js';
 import { describePlan } from '../income/plan.js';
-import { incomeStore } from '../income/store.js';
-import { loadTargets } from '../rebalance/check.js';
+import { convertRecorded, incomeStore } from '../income/store.js';
+import { loadTargets, saveTargets } from '../rebalance/check.js';
 import { PortfolioStore } from '../tools/portfolio/store.js';
 import { setSetting } from '../utils/config.js';
-import { baseCurrency, timeZone } from '../utils/locale.js';
+import { baseCurrency, money, timeZone } from '../utils/locale.js';
+import { yahoo, type MarketData } from '../market/yahoo.js';
 
 /**
  * Money commands answered by code, not the model, identically in the CLI and
@@ -40,10 +41,10 @@ export async function importFromText(text: string, fileName: string, hint = ''):
   return describePreview(await previewImport(text, account));
 }
 
-export async function runFinanceCommand(name: string, args: string): Promise<string | null> {
-  if ((INCOME_COMMANDS as readonly string[]).includes(name)) return runIncomeCommand(name as IncomeCommand, args);
-  if (name === 'targets' || name === 'rebalance') return runRebalanceCommand(name, args);
-  if (name === 'setup') return setup(args);
+export async function runFinanceCommand(name: string, args: string, market: MarketData = yahoo): Promise<string | null> {
+  if ((INCOME_COMMANDS as readonly string[]).includes(name)) return runIncomeCommand(name as IncomeCommand, args, market);
+  if (name === 'targets' || name === 'rebalance') return runRebalanceCommand(name, args, market);
+  if (name === 'setup') return setup(args, market);
   if (name === 'import') {
     const [first = '', ...rest] = args.trim().split(/\s+/);
     if (first === 'confirm') return confirmImport();
@@ -59,16 +60,26 @@ export async function runFinanceCommand(name: string, args: string): Promise<str
 }
 
 /** /setup: the owner's own settings, as a checklist. Everything else is changed where it lives (/tax, /yieldplan, /targets). */
-function setup(args: string): string {
+async function setup(args: string, market: MarketData = yahoo): Promise<string> {
   const [key = '', value = ''] = args.trim().split(/\s+/);
   if (key === 'currency') {
     if (!/^[a-z]{3}$/i.test(value)) return 'Currency is a three-letter code, e.g. /setup currency EUR.';
     const before = baseCurrency();
-    setSetting('base_currency', value.toUpperCase());
-    const ledger = incomeStore.ledger();
-    if (before !== baseCurrency() && (ledger.reserve || ledger.entries.length)) {
-      // ponytail: recorded amounts are not converted; do it when someone switches currency with real history.
-      return `Base currency is now ${baseCurrency()}. Amounts already recorded (reserve ${ledger.reserve}, ${ledger.entries.length} confirmed payments) stay in ${before} and are not converted.\n\n${setup('')}`;
+    const after = value.toUpperCase();
+    if (before !== after) {
+      // Everything recorded in the old currency is converted at today's rate, so
+      // the reserve, confirmed payments and minimum trade keep their value.
+      const rate = await market.rate(before, after);
+      if (!rate) return `No ${before}→${after} exchange rate available right now, so nothing was changed. Try again later.`;
+      const converted = convertRecorded(rate);
+      const targets = loadTargets();
+      targets.min_trade = Math.round(targets.min_trade * rate * 100) / 100;
+      saveTargets(targets);
+      setSetting('base_currency', after);
+      const note = converted || incomeStore.ledger().reserve
+        ? `Converted what was recorded at 1 ${before} = ${rate.toFixed(4)} ${after}: reserve now ${money(incomeStore.ledger().reserve)}, ${converted} payments.`
+        : '';
+      return [`Base currency is now ${after}.`, note, '', await setup('', market)].filter((l, i) => l || i === 2).join('\n');
     }
   } else if (key === 'timezone') {
     try { new Intl.DateTimeFormat('en', { timeZone: value }); }

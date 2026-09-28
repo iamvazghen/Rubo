@@ -91,6 +91,36 @@ export const incomeStore = {
   saveLedger: (l: Ledger) => writeJson('ledger.json', l),
 };
 
+const MONEY_FIELDS = ['gross', 'withholding', 'received', 'residence_tax', 'allowance_used', 'net'] as const;
+
+/**
+ * Re-express everything recorded in the base currency after it changes: the
+ * reserve, confirmed payments and the calendar. The allowance used stays in the
+ * jurisdiction's own currency. Returns how many confirmed payments were converted.
+ */
+export function convertRecorded(rate: number): number {
+  const r2 = (n: number) => Math.round(n * rate * 100) / 100;
+  const tax = (t: TaxBreakdown) => { for (const f of MONEY_FIELDS) t[f] = r2(t[f]); };
+  const ledger = incomeStore.ledger();
+  ledger.reserve = r2(ledger.reserve);
+  for (const e of ledger.entries) {
+    e.net = r2(e.net);
+    tax(e.tax);
+    for (const a of e.allocations) {
+      a.amount = r2(a.amount);
+      if (a.unit_price != null) a.unit_price = r2(a.unit_price);
+    }
+  }
+  incomeStore.saveLedger(ledger);
+  const cal = incomeStore.calendar();
+  for (const e of cal.events) {
+    e.gross = r2(e.gross);
+    tax(e.tax);
+  }
+  incomeStore.saveCalendar(cal.events);
+  return ledger.entries.length;
+}
+
 /** Make sure every account that holds something has tax settings (defaults from the broker registry). */
 export function ensureAccounts(accounts: string[]): string[] {
   const profile = incomeStore.tax();
