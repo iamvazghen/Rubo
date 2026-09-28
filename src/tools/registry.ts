@@ -44,7 +44,8 @@ import { createAskUserQuestion, ASK_USER_QUESTION_DESCRIPTION } from './ask-user
 import { getAllProviderLeaves } from './finance/providers/index.js';
 import { getAllNewsLeaves, getNewsRouterTool } from './news/index.js';
 import { portfolioView, portfolioAdd, portfolioRemove, portfolioJournal, portfolioSetRisk } from './portfolio/index.js';
-import { incomeCalendar, yieldPlanTool, taxProfileTool, incomeConfirm, rebalanceProposal, rebalanceTargets, portfolioImport } from './portfolio/finance-tools.js';
+import { incomeCalendar, yieldPlanTool, taxProfileTool, incomeConfirm,
+  reserveTool, rebalanceProposal, rebalanceTargets, portfolioImport } from './portfolio/finance-tools.js';
 import { dividendSafety, thesisCheck, newsMateriality } from '../judge/tools.js';
 import { jevAvailable } from '../judge/jev.js';
 import {
@@ -434,6 +435,7 @@ export function getToolRegistry(model: string): RegisteredTool[] {
     { name: 'income_calendar', tool: incomeCalendar, description: 'Dividends, distributions and coupons due in the next 90 days, gross and net in USD, with ids.', compactDescription: 'Upcoming income (dividends/coupons), gross and net.', concurrencySafe: true },
     { name: 'yield_plan', tool: yieldPlanTool, description: "Show or change the owner's income plan (reinvest/reserve/withdraw/repurpose). Confirm before changing.", compactDescription: 'Show or set the income plan.', concurrencySafe: false },
     { name: 'tax_profile', tool: taxProfileTool, description: 'Tax residence, per-account W-8BEN and withholding, allowance left. Confirm before changing.', compactDescription: 'Show or set the tax profile.', concurrencySafe: false },
+    { name: 'reserve_balance', tool: reserveTool, description: 'Down-market cash reserve: balance, dated movements; record money added or used when the owner says so.', compactDescription: 'Cash reserve balance and movements.', concurrencySafe: false },
     { name: 'income_confirm', tool: incomeConfirm, description: 'Record a payment as handled per plan. Only when the owner says it is done.', compactDescription: 'Mark an income payment as handled.', concurrencySafe: false },
     { name: 'rebalance_proposal', tool: rebalanceProposal, description: 'Drift from target weights and tax-aware trades to fix it. Suggestions only.', compactDescription: 'Rebalancing drift and suggested trades.', concurrencySafe: true },
     { name: 'rebalance_targets', tool: rebalanceTargets, description: 'Show or set rebalancing target weights. Confirm before changing.', compactDescription: 'Show or set target weights.', concurrencySafe: false },

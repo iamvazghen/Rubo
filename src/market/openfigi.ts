@@ -43,13 +43,16 @@ export function figiToListings(data: { ticker?: string; exchCode?: string; secur
 
 export async function openFigiListings(isin: string): Promise<IsinMatch[]> {
   try {
-    const key = process.env.OPENFIGI_API_KEY?.trim();
-    const res = await fetch('https://api.openfigi.com/v3/mapping', {
+    const call = (key?: string) => fetch('https://api.openfigi.com/v3/mapping', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(key ? { 'X-OPENFIGI-APIKEY': key } : {}) },
       body: JSON.stringify([{ idType: 'ID_ISIN', idValue: isin }]),
       signal: AbortSignal.timeout(15_000),
     });
+    const key = process.env.OPENFIGI_API_KEY?.trim();
+    let res = await call(key);
+    // A rejected key must not cost the lookup: the keyless tier still answers.
+    if (res.status === 401 && key) res = await call();
     if (!res.ok) return [];
     const [first] = (await res.json()) as { data?: any[] }[];
     return figiToListings(first?.data ?? []);

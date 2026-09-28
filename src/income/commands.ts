@@ -21,7 +21,7 @@ export async function runIncomeCommand(command: IncomeCommand, args: string, mar
     case 'income': return income(args, market);
     case 'yieldplan': return yieldPlan(args);
     case 'tax': return tax(args);
-    case 'reserve': return reserve();
+    case 'reserve': return reserve(args);
     case 'done': return done(args, market);
   }
 }
@@ -141,11 +141,35 @@ function tax(args: string): string {
   return lines.join('\n');
 }
 
-function reserve(): string {
+/**
+ * The down-market cash reserve: income flows in through /done; the owner adds
+ * cash or takes it out (to buy in a downturn, or to spend) with /reserve add|use.
+ * Every movement is dated.
+ */
+function reserve(args: string): string {
   const l = incomeStore.ledger();
-  const moves = l.entries.slice(-5).flatMap((e) =>
-    e.allocations.filter((a) => a.action === 'reserve').map((a) => `  +${money(a.amount)} from ${e.ticker} (${e.confirmedAt.slice(0, 10)})`));
-  return [`Cash reserve for down markets: ${money(l.reserve)}`, ...(moves.length ? ['Recent:', ...moves] : [])].join('\n');
+  const [verb = '', rawAmount = '', ...noteWords] = args.trim().split(/\s+/).filter(Boolean);
+  if (verb === 'add' || verb === 'use') {
+    const amount = Math.round(Number(rawAmount.replace(',', '.')) * 100) / 100;
+    if (!(amount > 0)) return `Use /reserve ${verb} <amount> [note], e.g. /reserve ${verb} 500 ${verb === 'use' ? 'bought VWCE in the dip' : 'monthly top-up'}.`;
+    if (verb === 'use' && amount > l.reserve + 1e-9) return `The reserve holds ${money(l.reserve)}; ${money(amount)} is more than that.`;
+    const signed = verb === 'add' ? amount : -amount;
+    l.reserve = Math.round((l.reserve + signed) * 100) / 100;
+    l.reserve_moves = [...(l.reserve_moves ?? []), { at: new Date().toISOString(), amount: signed, note: noteWords.join(' ') || (verb === 'add' ? 'added' : 'used') }];
+    incomeStore.saveLedger(l);
+  } else if (verb) return 'Use /reserve, /reserve add <amount> [note] or /reserve use <amount> [note].';
+
+  // One dated history: income put aside by the plan, plus the owner's own movements.
+  const moves = [
+    ...l.entries.flatMap((e) => e.allocations.filter((a) => a.action === 'reserve' && a.amount > 0)
+      .map((a) => ({ at: e.confirmedAt, amount: a.amount, note: `from ${e.ticker}` }))),
+    ...(l.reserve_moves ?? []),
+  ].sort((a, b) => a.at.localeCompare(b.at)).slice(-8);
+  return [
+    `Cash reserve for down markets: ${money(l.reserve)}`,
+    ...(moves.length ? ['Recent:', ...moves.map((m) => `  ${m.amount >= 0 ? '+' : '−'}${money(Math.abs(m.amount))} ${m.note} (${m.at.slice(0, 10)})`)] : []),
+    '', 'Add or take out: /reserve add 500 [note] · /reserve use 300 bought in the dip',
+  ].join('\n');
 }
 
 async function done(args: string, market: MarketData): Promise<string> {

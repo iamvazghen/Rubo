@@ -60,6 +60,8 @@ export interface Ledger {
   /** Allowance consumed per account and calendar year, in the jurisdiction's currency. */
   allowance_used: Record<string, { year: number; amount: number }>;
   entries: LedgerEntry[];
+  /** The owner's own additions (+) and uses (−) of the reserve, dated. */
+  reserve_moves?: { at: string; amount: number; note: string }[];
 }
 
 const file = (name: string) => ruboPath('income', name);
@@ -103,6 +105,7 @@ export function convertRecorded(rate: number): number {
   const tax = (t: TaxBreakdown) => { for (const f of MONEY_FIELDS) t[f] = r2(t[f]); };
   const ledger = incomeStore.ledger();
   ledger.reserve = r2(ledger.reserve);
+  for (const m of ledger.reserve_moves ?? []) m.amount = r2(m.amount);
   for (const e of ledger.entries) {
     e.net = r2(e.net);
     tax(e.tax);

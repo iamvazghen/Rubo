@@ -13,9 +13,21 @@ const run = async (name: string, args: string) => formatToolResult({ result: awa
 
 export const incomeCalendar = new DynamicStructuredTool({
   name: 'income_calendar',
-  description: 'Dividends, fund distributions and bond coupons due in the next 90 days, gross and net of withholding and German tax, in USD, with event ids.',
+  description: "Dividends, fund distributions and bond coupons due in the next 90 days, gross and net of withholding and the owner's residence tax, in the owner's base currency, with event ids.",
   schema: z.object({ refresh: z.boolean().optional().describe('Re-fetch dates and amounts first (slower).') }),
   func: ({ refresh }) => run('income', refresh ? 'refresh' : ''),
+});
+
+export const reserveTool = new DynamicStructuredTool({
+  name: 'reserve_balance',
+  description:
+    "The owner's down-market cash reserve: balance and dated movements. `add`/`use` record money the owner put in or took out (a durable change: only when the owner says so).",
+  schema: z.object({
+    action: z.enum(['show', 'add', 'use']),
+    amount: z.number().positive().optional().describe('Base currency, for add/use.'),
+    note: z.string().optional(),
+  }),
+  func: ({ action, amount, note }) => run('reserve', action === 'show' ? '' : `${action} ${amount ?? ''} ${note ?? ''}`),
 });
 
 export const yieldPlanTool = new DynamicStructuredTool({

@@ -297,3 +297,20 @@ describe('changing the base currency', () => {
     expect(baseCurrency()).toBe('EUR');
   });
 });
+
+describe('the cash reserve', () => {
+  test('owner additions and uses are dated; the reserve cannot go below zero', async () => {
+    const { commands, store } = await mods();
+    store.incomeStore.saveLedger({ reserve: 100, allowance_used: {}, entries: [] });
+    expect(await commands.runIncomeCommand('reserve', 'add 250 monthly top-up', market)).toContain('$350.00');
+    expect(await commands.runIncomeCommand('reserve', 'use 500', market)).toContain('more than that');
+    const shown = await commands.runIncomeCommand('reserve', 'use 300 bought VWCE in the dip', market);
+    expect(shown).toContain('Cash reserve for down markets: $50.00');
+    expect(shown).toContain('−$300.00 bought VWCE in the dip');
+    expect(shown).toContain('+$250.00 monthly top-up');
+    const moves = store.incomeStore.ledger().reserve_moves!;
+    expect(moves.map((m) => m.amount)).toEqual([250, -300]);
+    expect(moves[0]!.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(await commands.runIncomeCommand('reserve', 'add abc', market)).toContain('Use /reserve add <amount>');
+  });
+});
