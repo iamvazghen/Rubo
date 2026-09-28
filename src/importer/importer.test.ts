@@ -164,3 +164,23 @@ describe('listings from OpenFIGI', () => {
     expect(p.changes[0]!.position.data_symbol).toBe('VGWD.DE');
   });
 });
+
+describe('purchase lots from a transaction export', () => {
+  test('newest-first exports are replayed in date order; sales use the oldest lots first', () => {
+    const csvText = [
+      'Date,Type,ISIN,Quantity,Price,Currency',
+      '2026-03-01,Sell,US1912161007,15,72,USD', // newest first, as many brokers export
+      '2025-06-01,Buy,US1912161007,10,60,USD',
+      '2024-01-10,Buy,US1912161007,10,50,USD',
+    ].join('\n');
+    const [ko] = parseBrokerExport(csvText).holdings;
+    expect(ko!.shares).toBe(5);
+    expect(ko!.lots).toEqual([{ date: '2025-06-01', shares: 5, price: 60 }]); // the 2024 lot went first
+    expect(ko!.avg_cost).toBe(55); // average cost, as brokers display it
+  });
+
+  test('a holdings list (not transactions) has no lots', () => {
+    const [h] = parseBrokerExport('ISIN,Quantity,Price,Currency\nUS1912161007,10,50,USD\n').holdings;
+    expect(h!.lots).toBeUndefined();
+  });
+});
