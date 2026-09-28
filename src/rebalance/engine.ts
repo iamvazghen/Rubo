@@ -116,7 +116,7 @@ export function saleCost(p: Position, shares: number): { cost: number; basis: 'f
 
 /**
  * Cheapest path back to target: new cash goes to underweights first; only then
- * are overweights sold, largest overweight first, with the owner's tax on the
+ * are overweights sold, the cheapest in tax first within each bucket, with the owner's tax on the
  * realised gain and the broker's fees estimated.
  */
 export function proposeRebalance(p: {
@@ -174,11 +174,8 @@ export function proposeRebalance(p: {
   for (const d of over) {
     const amount = -gap.get(d.key)!;
     if (amount < t.min_trade) continue;
-    // Sell from the biggest holdings in the bucket first.
-    let left = amount;
-    for (const h of p.holdings.filter((x) => bucketOf(t, x.position) === d.key).sort((a, b) => b.value - a.value)) {
-      if (left < t.min_trade) break;
-      const amount = Math.min(left, h.value);
+    // Tax and fee of selling `amount` of one holding, given the allowance left in its account.
+    const saleOf = (h: ValuedHolding, amount: number) => {
       const priceBase = h.price_local * h.base_per_local;
       const shares = Math.floor((amount / priceBase) * 10_000) / 10_000;
       const { cost, basis } = saleCost(h.position, shares);
@@ -189,6 +186,18 @@ export function proposeRebalance(p: {
       const leftAllowance = p.allowanceLeft(account) - (allowanceUsed.get(account) ?? 0);
       const tax = capitalGainsTax({ gain, assetType: h.position.asset_type, partialExemptionPct: h.position.partial_exemption_pct,
         profile: p.profile, allowanceLeft: leftAllowance, basePerAllowanceUnit: p.basePerAllowanceUnit });
+      return { shares, basis, f, account, tax };
+    };
+    // Cheapest first: the holdings whose sale costs the least tax per unit sold
+    // (losses, gains the remaining allowance covers, fund exemptions), then the biggest.
+    let left = amount;
+    const bucket = p.holdings.filter((x) => bucketOf(t, x.position) === d.key);
+    const taxRate = (h: ValuedHolding) => { const x = Math.min(left, h.value); return x > 0 ? saleOf(h, x).tax.tax / x : 0; };
+    const rates = new Map(bucket.map((h) => [h, taxRate(h)]));
+    for (const h of bucket.sort((a, b) => rates.get(a)! - rates.get(b)! || b.value - a.value)) {
+      if (left < t.min_trade) break;
+      const amount = Math.min(left, h.value);
+      const { shares, basis, f, account, tax } = saleOf(h, amount);
       allowanceUsed.set(account, (allowanceUsed.get(account) ?? 0) + tax.allowance_used / p.basePerAllowanceUnit);
       taxTotal += tax.tax;
       trades.push({ side: 'sell', key: d.key, ticker: h.position.ticker, amount: round2(amount), shares, est_tax: tax.tax, est_fee: f, cost_basis: basis });

@@ -99,3 +99,27 @@ describe('rebalancing: lots, fees, weights after, regions', () => {
     expect(p.notes.join(' ')).toContain('no region known for VT');
   });
 });
+
+describe('rebalancing: cheapest sale first', () => {
+  test('within a bucket, the holding the remaining allowance covers is sold before a bigger taxable one', () => {
+    // Both stocks, 80 % together vs a 50 % target. KO (ibkr, no allowance) has a large gain;
+    // DTE (traderepublic, allowance left) a small one. Selling DTE first costs no tax.
+    const ko = { ...pos('KO', 'stock', 100, 30), account: 'ibkr' };
+    const dte = { ...pos('DTE', 'stock', 100, 25), account: 'traderepublic' };
+    const vt = pos('VT', 'etf', 20, 100);
+    const p = proposeRebalance({
+      ...base, holdings: [held(ko, 70), held(dte, 30), held(vt, 125)],
+      allowanceLeft: (a) => (a === 'traderepublic' ? 1000 : 0), newCash: 0,
+    });
+    const sells = p.trades.filter((t) => t.side === 'sell');
+    expect(sells[0]).toMatchObject({ ticker: 'DTE', est_tax: 0 });
+    // 12,500 total; stock 10,000 → target 6,250: DTE's 3,000 first (gain 500, covered), then 750 of KO.
+    expect(sells.map((s) => [s.ticker, s.amount])).toEqual([['DTE', 3000], ['KO', 750]]);
+  });
+});
+
+test('band edges: exactly on the band is inside, just beyond is outside', () => {
+  // 70/30 holdings: drift exactly 5 points against 65/35.
+  expect(computeDrift(holdings, 0, { ...targets, targets: { stock: 65, etf: 35 } }).drifts.every((d) => !d.outside_band)).toBe(true);
+  expect(computeDrift(holdings, 0, { ...targets, targets: { stock: 64.9, etf: 35.1 } }).drifts.every((d) => d.outside_band)).toBe(true);
+});
