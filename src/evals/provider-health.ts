@@ -34,6 +34,18 @@ const FIXTURES: Record<string, Record<string, unknown>> = {
   get_catalyst_calendar: { ticker: 'AAPL' },
   get_global_stock: { ticker: 'VOD.LSE' },
 
+  // --- holdings, income and rebalancing (read-only calls; state is the owner's)
+  income_calendar: {},
+  yield_plan: { action: 'show' },
+  tax_profile: { action: 'show' },
+  reserve_balance: { action: 'show' },
+  rebalance_targets: { command: '' },
+  rebalance_proposal: {},
+
+  // --- Jev (TypeSafe); answers are cached, so a repeat sweep costs nothing
+  dividend_safety: { ticker: 'KO' },
+  news_materiality: { ticker: 'KO', news: '2026-07-21, Reuters: Coca-Cola raises full-year organic revenue growth guidance to 6 %.' },
+
   // --- macro
   get_fred_series: { series: 'fed_funds' },
   fred_search: { query: '30 year mortgage rate', limit: 3 },
@@ -174,6 +186,9 @@ const EXCLUDED: Record<string, string> = {
   portfolio_remove: 'mutates the portfolio',
   portfolio_journal: 'mutates the portfolio',
   portfolio_set_risk: 'mutates the portfolio',
+  income_confirm: 'records a payment: mutates the ledger and holdings',
+  portfolio_import: 'writes the pending import, which would replace one the owner is reviewing',
+  thesis_check: 'needs a held position with a real thesis; covered by src/judge tests',
 };
 /**
  * Provider errors that mean "your plan", not "your code". A rate limit is
