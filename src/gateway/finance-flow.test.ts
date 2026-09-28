@@ -33,7 +33,7 @@ beforeAll(async () => {
   process.env.RUBO_HOME = home;
   process.env.RUBO_TIMEZONE = 'America/New_York';
   process.env.TELEGRAM_BOT_TOKEN = 'test-token';
-  delete process.env.TYPESAFE_API_KEY;
+  process.env.TYPESAFE_API_KEY = '';
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     sent.push({ method: String(url).split('/').pop()!, payload: JSON.parse(String(init?.body ?? '{}')) });
     return new Response(JSON.stringify({ ok: true, result: { message_id: sent.length } }), { headers: { 'content-type': 'application/json' } });

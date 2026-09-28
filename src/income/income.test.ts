@@ -9,7 +9,7 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'rubo-income-'));
   process.env.RUBO_HOME = home;
   process.env.RUBO_TIMEZONE = 'Europe/Berlin';
-  delete process.env.TYPESAFE_API_KEY;
+  process.env.TYPESAFE_API_KEY = '';
 });
 afterEach(() => {
   delete process.env.RUBO_HOME;

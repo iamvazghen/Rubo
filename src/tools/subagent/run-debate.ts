@@ -13,6 +13,7 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { z } from 'zod';
 import { formatToolResult } from '../types.js';
+import { debateVerdict, jevAvailable, type DebateVerdict } from '../../judge/jev.js';
 import {
   SUBAGENT_TYPES,
   DEFAULT_SUBAGENT_TYPE,
@@ -232,11 +233,25 @@ Synthesize the four specialist views above into one coherent conclusion. Follow 
         { role: 'judge', answer: judgeAnswer, duration_ms: Date.now() - t1Judge, timed_out: judgeTimedOut },
       ];
 
+      // Jev's calibrated verdict next to the judge's prose, when a key is set.
+      // A probability, never a replacement for the synthesis.
+      let jevVerdict: DebateVerdict | null = null;
+      if (jevAvailable() && !judgeTimedOut) {
+        onProgress?.('Debate: asking Jev for a calibrated verdict…');
+        const view = (role: SpecialistOutput['role']) => outputs.find((o) => o.role === role)?.answer ?? '';
+        jevVerdict = await debateVerdict({
+          thesis: input.thesis,
+          ticker: input.ticker,
+          views: { bull: view('bull'), bear: view('bear'), quant: view('quant'), macro: view('macro'), judge: view('judge') },
+        });
+      }
+
       return formatToolResult({
         thesis: input.thesis,
         ticker: input.ticker,
         specialist_outputs: outputs,
         judge_synthesis: judgeAnswer,
+        ...(jevVerdict ? { jev_verdict: { ...jevVerdict, note: 'Jev (TypeSafe) probabilities over the debate as argued; present as probabilities' } } : {}),
         total_duration_ms: total_ms,
         parallel_execution: true,
         timed_out_count: outputs.filter((o) => o.timed_out).length,

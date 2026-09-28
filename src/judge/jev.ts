@@ -80,6 +80,49 @@ export async function judge(p: {
   }
 }
 
+export interface DebateVerdict {
+  /** Probability the thesis holds over its horizon (12 months when none is stated). */
+  thesis_holds: number | null;
+  stronger_case: 'bull' | 'bear' | 'balanced' | null;
+  case_probabilities?: Record<string, number>;
+}
+
+/**
+ * A calibrated verdict on a finished bull/bear debate, next to the judge
+ * subagent's written synthesis. Jev weighs the arguments as given; it adds no
+ * facts. Long answers are cut to keep the request small. Cached for a day.
+ */
+export async function debateVerdict(p: {
+  thesis: string;
+  ticker?: string;
+  views: Record<'bull' | 'bear' | 'quant' | 'macro' | 'judge', string>;
+}): Promise<DebateVerdict | null> {
+  const cut = (s: string) => (s.length > 4000 ? `${s.slice(0, 4000)} …` : s);
+  const answers = await judge({
+    kind: 'debate_verdict',
+    subject: `${p.ticker ?? '-'}:${p.thesis.slice(0, 80)}`,
+    state: { thesis: p.thesis, ticker: p.ticker ?? null, views: Object.fromEntries(Object.entries(p.views).map(([k, v]) => [k, cut(v)])) },
+    questions: {
+      holds: {
+        type: 'noul',
+        instructions: 'Weighing the `views` of the debate, will `thesis` hold over its stated horizon (12 months if none is stated)?',
+        criteria: { true: 'the thesis plays out as stated', false: 'it does not' },
+      },
+      stronger: {
+        type: 'choice',
+        instructions: 'Which side of the debate in `views` made the better-supported case (evidence, numbers, named catalysts or risks)?',
+        criteria: { bull: 'the bull case', bear: 'the bear case', balanced: 'neither clearly' },
+      },
+    },
+  });
+  if (!answers) return null;
+  return {
+    thesis_holds: answers.holds?.noul ?? null,
+    stronger_case: (answers.stronger?.choice as DebateVerdict['stronger_case']) ?? null,
+    case_probabilities: answers.stronger?.probabilities,
+  };
+}
+
 /** Probability of a dividend cut in the next 12 months, from fundamentals. Cached for 7 days. */
 export async function dividendCutRisk(ticker: string, fundamentals: Record<string, number>): Promise<number | null> {
   const answers = await judge({
