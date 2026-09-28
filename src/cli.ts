@@ -575,6 +575,25 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
   let slashActive = false;
 
 
+  // A fresh session, like Telegram's /new: empty screen and model context, new id.
+  // The previous session stays saved and resumable.
+  const startFresh = () => {
+    chatLog.clearAll();
+    modelSelection.inMemoryChatHistory.clear();
+    lastRenderedEventCount = 0;
+    lastRenderedStatus = '';
+    lastRenderedAnswer = false;
+    lastRenderedQueryId = null;
+    finalizedToolIds.clear();
+    appliedToolProgress.clear();
+    const previous = sessionStore?.turns.length ? sessionStore.id : null;
+    sessionStore = SessionStore.create(modelSelection.model, 'cli');
+    chatLog.addChild(new Spacer(1));
+    chatLog.addChild(new Text(theme.muted(
+      `✦ New session ${sessionStore.id}${previous ? ` · the previous one is saved: /resume ${previous}` : ''}`), 0, 0));
+    tui.requestRender();
+  };
+
   // Replay a saved session into the live view and re-seed model context, then
   // point the active store at it so new turns continue that thread.
   const resumeInto = (session: SessionFile) => {
@@ -642,8 +661,15 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
         tui.requestRender();
         break;
       }
+      case 'new':
       case 'clear':
-        chatLog.clearAll();
+        startFresh();
+        break;
+      case 'session':
+        chatLog.addChild(new Spacer(1));
+        chatLog.addChild(new Text(theme.muted(sessionStore?.turns.length
+          ? `Current session: ${sessionStore.id} · /new starts another, /sessions lists them all.`
+          : `Current session: ${sessionStore?.id} (saved after your first question).`), 0, 0));
         tui.requestRender();
         break;
       case 'memory':

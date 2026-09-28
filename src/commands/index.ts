@@ -52,7 +52,9 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'rebalance', description: 'How far holdings drifted and the trades that fix it', category: 'Portfolio', usage: '/rebalance [cash 1000]' },
 
   // --- Session
-  { name: 'clear', description: 'Clear the conversation and start fresh', category: 'Session' },
+  { name: 'new', description: 'Start a new session; the current one stays saved and resumable', category: 'Session' },
+  { name: 'clear', description: 'Same as /new: clear the screen and start a new session', category: 'Session' },
+  { name: 'session', description: 'Show the id of the current session', category: 'Session' },
   { name: 'history', description: 'Show recent conversation summaries', category: 'Session' },
   { name: 'sessions', description: 'List saved CLI and Telegram sessions you can resume', category: 'Session' },
   { name: 'resume', description: 'Resume a session: /resume telegram:2026-09-28_14-05-12, or the latest', category: 'Session' },

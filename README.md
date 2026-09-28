@@ -308,6 +308,7 @@ telegram:2026-09-28_18-40-03
 |---|---|---|
 | CLI | `rubo --resume [id]` | Start by continuing a session (the latest if no id) |
 | CLI | `/sessions`, `/resume [id]` | Pick a session, or continue one by id |
+| CLI | `/new` (or `/clear`), `/session` | Start a new session, show the current one |
 | Telegram | `/sessions` | List saved sessions from both surfaces |
 | Telegram | `/resume <id>`, `/new`, `/session` | Continue one, start a new one, show the current one |
 
