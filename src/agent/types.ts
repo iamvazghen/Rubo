@@ -81,14 +81,6 @@ export interface AgentConfig {
   agentLabel?: string;
 }
 
-/**
- * Message in conversation history
- */
-export interface Message {
-  role: 'user' | 'assistant' | 'tool';
-  content: string;
-}
-
 // ============================================================================
 // Agent Events (for real-time streaming UI)
 // ============================================================================

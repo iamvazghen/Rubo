@@ -92,6 +92,3 @@ export function getLeaves(): StructuredToolInterface[] | null {
   // Always available — no key required
   return [supply, networkStats];
 }
-
-export const btcSupply = supply;
-export const btcNetworkStats = networkStats;

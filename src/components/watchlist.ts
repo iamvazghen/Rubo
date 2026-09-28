@@ -7,7 +7,7 @@
  * `setQuotes()` whenever new data arrives (driven by its own setInterval),
  * keeping this component pure-render.
  */
-import { Box, Container, Spacer, Text } from '@mariozechner/pi-tui';
+import { Box, Spacer, Text } from '@mariozechner/pi-tui';
 import { theme } from '../theme.js';
 import { pctChange, sparkline } from '../utils/sparkline.js';
 
@@ -78,6 +78,3 @@ export class WatchlistComponent extends Box {
     }
   }
 }
-
-// Container type alias — keeps tree assembly uniform
-export const WatchlistPlaceholder = Container;

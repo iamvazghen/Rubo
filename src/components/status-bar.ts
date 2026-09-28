@@ -7,7 +7,7 @@
  *   statusBar.setProvider(`OpenAI · gpt-5.5`);
  *   statusBar.setStats({ inputTokens, outputTokens, totalTokens, costUsd, iter, maxIter, tps });
  */
-import { Container, Text, TruncatedText } from '@mariozechner/pi-tui';
+import { Container, Text } from '@mariozechner/pi-tui';
 import { theme } from '../theme.js';
 import { formatTokensCompact } from '../utils/format.js';
 import { formatUsd } from '../utils/cost.js';
@@ -106,8 +106,3 @@ export class StatusBarComponent extends Container {
     return [fitSegments(this.segments, width, theme.muted(' · '))];
   }
 }
-
-/**
- * Truncated helper used by status bar — re-exported so cli.ts can stay tidy.
- */
-export const StatusLabel = TruncatedText;

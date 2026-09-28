@@ -183,12 +183,4 @@ export function getLeaves(): StructuredToolInterface[] | null {
   ];
 }
 
-export const finnhubQuote = quote;
-export const finnhubProfile = profile;
-export const finnhubPeers = peers;
-export const finnhubRecommendation = recommendation;
-export const finnhubSentiment = sentiment;
 export const finnhubEarningsCalendar = earningsCalendar;
-export const finnhubInsiderTransactions = insiderTransactions;
-export const finnhubInsiderSentiment = insiderSentiment;
-export const finnhubSymbolSearch = symbolSearch;

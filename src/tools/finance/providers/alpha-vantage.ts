@@ -132,8 +132,4 @@ export function getLeaves(): StructuredToolInterface[] | null {
   return [stockQuote, stockTimeSeries, fxRate, cryptoRate, commodityPrice];
 }
 
-export const alphavantageStockQuote = stockQuote;
-export const alphavantageStockTimeSeries = stockTimeSeries;
-export const alphavantageFxRate = fxRate;
-export const alphavantageCryptoRate = cryptoRate;
 export const alphavantageCommodity = commodityPrice;

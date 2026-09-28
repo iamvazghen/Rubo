@@ -145,4 +145,3 @@ export const api = {
 };
 
 /** @deprecated Use `api.get` instead */
-export const callApi = api.get;

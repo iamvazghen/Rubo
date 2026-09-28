@@ -42,10 +42,6 @@ const URL_CACHE = new LRUCache<string, CacheEntry>({
   ttl: CACHE_TTL_MS,
 });
 
-export function clearWebFetchCache(): void {
-  URL_CACHE.clear();
-}
-
 // Lazy singleton TurndownService. Defers the turndown import until the first
 // HTML fetch and reuses one instance across calls (construction is the
 // expensive part; .turndown() is stateless).

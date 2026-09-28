@@ -177,11 +177,3 @@ export function setActiveTheme(name: ThemeName): ThemeName {
 export function getActiveTheme(): ThemeName {
   return activeName;
 }
-
-/** Advance to the next theme in THEMES order (wraps around). Returns the new theme. */
-export function cycleTheme(): { name: ThemeName; label: string } {
-  const idx = THEMES.findIndex((t) => t.name === activeName);
-  const next = THEMES[(idx + 1) % THEMES.length];
-  setActiveTheme(next.name);
-  return next;
-}

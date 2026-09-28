@@ -1,13 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { MemoryChunk } from './types.js';
 
-function lineCount(text: string): number {
-  if (!text) {
-    return 1;
-  }
-  return text.split('\n').length;
-}
-
 function tokenToCharBudget(tokens: number): number {
   // Keep the same approximation used in src/utils/tokens.ts.
   return Math.max(1, Math.floor(tokens * 3.5));
@@ -144,12 +137,4 @@ export function buildSnippet(content: string, maxChars = 700): string {
     return collapsed;
   }
   return `${collapsed.slice(0, maxChars).trim()}...`;
-}
-
-export function estimateChunkTokens(chunk: MemoryChunk): number {
-  return Math.ceil(chunk.content.length / 3.5);
-}
-
-export function countLinesInChunk(chunk: MemoryChunk): number {
-  return lineCount(chunk.content);
 }

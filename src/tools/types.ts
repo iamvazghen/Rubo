@@ -29,29 +29,6 @@ export function formatToolResult(data: unknown, sourceUrls?: string[]): string {
 }
 
 /**
- * Format a ProviderResult-shaped call (with freshness metadata + a single
- * numbered source reference). Used by every meta-tool router so the agent
- * sees consistent provenance on every tool result.
- */
-export function formatProviderResult(
-  data: unknown,
-  citationId: number,
-  url: string,
-  provider: string,
-  asOf?: string,
-  title?: string,
-): string {
-  const result: ToolResult = {
-    data,
-    sourceUrls: [url],
-    sources: [{ id: citationId, url, provider, title }],
-    provider,
-  };
-  if (asOf) result.asOf = asOf;
-  return JSON.stringify(result);
-}
-
-/**
  * Parse search results from a search provider response.
  * Handles both string and object responses, extracting URLs from results.
  * Supports multiple response shapes from different providers.

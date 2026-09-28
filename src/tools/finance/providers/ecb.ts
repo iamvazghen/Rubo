@@ -91,7 +91,4 @@ export function getLeaves(): StructuredToolInterface[] | null {
   return [policyRate, hicp, fxRate];
 }
 
-export const ecbPolicyRate = policyRate;
-export const ecbHicp = hicp;
-export const ecbFxRate = fxRate;
 export { KNOWN_SERIES as _ecbKnownSeriesForTest };

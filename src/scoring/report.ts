@@ -313,7 +313,3 @@ function writeReport(r: UniverseReport): string {
   writeFileSync(path, r.markdown, 'utf-8');
   return path;
 }
-
-export function reportPath(at: string, horizon: Horizon): string {
-  return ruboPath('reports', `${at.slice(0, 10)}-${horizon}.md`);
-}

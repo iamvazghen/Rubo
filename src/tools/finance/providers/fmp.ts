@@ -147,12 +147,4 @@ export function getLeaves(): StructuredToolInterface[] | null {
   return [profile, ratios, dcf, incomeStatement, balanceSheet, earningsCalendar, stockScreener, earningsSurprises, priceTarget];
 }
 
-export const fmpProfile = profile;
-export const fmpRatios = ratios;
-export const fmpDcf = dcf;
-export const fmpIncomeStatement = incomeStatement;
-export const fmpBalanceSheet = balanceSheet;
 export const fmpEarningsCalendar = earningsCalendar;
-export const fmpStockScreener = stockScreener;
-export const fmpEarningsSurprises = earningsSurprises;
-export const fmpPriceTarget = priceTarget;

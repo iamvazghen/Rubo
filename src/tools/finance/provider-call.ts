@@ -56,7 +56,6 @@ export const TTL_NEWS = TTL_15M;
 export const TTL_FUNDAMENTALS = TTL_24H;
 export const TTL_EOD_PRICES = TTL_24H;
 export const TTL_INTRADAY_QUOTE = TTL_15M;
-export const TTL_LONG_TERM = TTL_24H;
 
 /** Backoff steps for a rate-limited provider, in ms. */
 const RETRY_DELAYS_MS = [1_000, 3_000, 8_000];

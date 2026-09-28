@@ -46,5 +46,3 @@ const centralBankRate = new DynamicStructuredTool({
 export function getLeaves(): StructuredToolInterface[] | null {
   return [centralBankRate];
 }
-
-export const bisCentralBankRate = centralBankRate;

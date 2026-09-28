@@ -101,26 +101,3 @@ Period filters (report_period / report_period_gte|lte|gt|lt) accept YYYY-MM-DD. 
     return formatToolResult(data.institutional_holdings ?? [], [url]);
   },
 });
-
-const InstitutionalInvestorsInputSchema = z.object({
-  name: z
-    .string()
-    .optional()
-    .describe("Case-insensitive name prefix to filter investors by (e.g. 'BERKSHIRE', 'BLACKROCK'). Omit to list all known investors."),
-});
-
-export const getInstitutionalInvestors = new DynamicStructuredTool({
-  name: 'get_institutional_investors',
-  description: `Look up institutional 13F filers by name prefix and get their CIK. Returns a list of {cik, name} pairs. Use this to resolve a manager name (e.g. 'Berkshire Hathaway') into the filer_cik value to pass to get_institutional_holdings.`,
-  schema: InstitutionalInvestorsInputSchema,
-  func: async (input) => {
-    const params: Record<string, string | undefined> = {
-      name: input.name,
-    };
-    const { data, url } = await api.get('/institutional-holdings/investors', params, {
-      cacheable: true,
-      ttlMs: TTL_1H,
-    });
-    return formatToolResult(data.investors ?? [], [url]);
-  },
-});

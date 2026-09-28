@@ -227,7 +227,3 @@ export function getLeaves(): StructuredToolInterface[] | null {
   // No key required.
   return [financials, filings];
 }
-
-export const secFinancials = financials;
-export const secFilings = filings;
-export { CONCEPTS as SEC_CONCEPTS };
