@@ -6,6 +6,7 @@
  * modules that do decide can be tested against fixtures through the
  * `MarketData` interface instead of the network.
  */
+import { fmpDividendCalendar, fresher } from './fmp-dividends.js';
 import { openFigiListings } from './openfigi.js';
 
 export interface DividendHistory {
@@ -130,7 +131,7 @@ export const yahoo: MarketData = {
   },
 
   async dividendCalendar(symbol) {
-    {
+    const fromYahoo = async (): Promise<DividendCalendar | null> => {
       const r = await quoteSummary(symbol, 'calendarEvents,summaryDetail');
       if (!r) return null;
       const cal = r.calendarEvents ?? {};
@@ -139,7 +140,10 @@ export const yahoo: MarketData = {
         payDate: cal.dividendDate?.raw ? day(cal.dividendDate.raw) : undefined,
         annualRate: r.summaryDetail?.dividendRate?.raw,
       };
-    }
+    };
+    // Yahoo first; FMP (with a key) fills a missing or older announcement.
+    const [y, f] = await Promise.all([fromYahoo(), fmpDividendCalendar(symbol)]);
+    return fresher(y, f);
   },
 
   async fundamentals(symbol) {

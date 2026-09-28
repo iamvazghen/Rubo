@@ -314,3 +314,42 @@ describe('the cash reserve', () => {
     expect(await commands.runIncomeCommand('reserve', 'add abc', market)).toContain('Use /reserve add <amount>');
   });
 });
+
+describe('second dividend source (FMP)', () => {
+  test('the latest announcement is read, and the fresher of two calendars wins', async () => {
+    const { fmpToCalendar, fresher } = await import('../market/fmp-dividends.js');
+    expect(fmpToCalendar([
+      { date: '2026-06-15', paymentDate: '2026-07-01', dividend: 0.51, frequency: 'Quarterly' },
+      { date: '2026-09-15', paymentDate: '2026-10-01', dividend: 0.53, frequency: 'Quarterly' },
+    ])).toEqual({ exDate: '2026-09-15', payDate: '2026-10-01', annualRate: 2.12 });
+    expect(fmpToCalendar([])).toBeNull();
+    const yahooOld = { exDate: '2026-06-15', payDate: '2026-07-01', annualRate: 2.04 };
+    const fmpNew = { exDate: '2026-09-15', payDate: '2026-10-01', annualRate: 2.12 };
+    expect(fresher(yahooOld, fmpNew)).toEqual(fmpNew);
+    expect(fresher({ exDate: '2026-09-15', annualRate: 2.12 }, { exDate: '2026-09-15', payDate: '2026-10-01' }))
+      .toEqual({ exDate: '2026-09-15', payDate: '2026-10-01', annualRate: 2.12 }); // pay date filled in
+    expect(fresher(null, fmpNew)).toEqual(fmpNew);
+    expect(fresher(yahooOld, null)).toEqual(yahooOld);
+  });
+});
+
+describe('a dividend cut between estimate and announcement', () => {
+  test('the owner is told once, when the lower amount is first announced', async () => {
+    const { refresh, portfolio } = await mods();
+    new portfolio.PortfolioStore().write({ version: 1, updated: '', positions: [
+      { ticker: 'KO', shares: 100, avg_cost: 55, currency: 'USD', opened: '2024-01-01', thesis: 't', conviction: 'med', isin: 'US1912161007', account: 'ibkr' },
+    ], closed: [], journal: [], notes: [] });
+    const now = new Date('2026-09-28T08:00:00Z');
+    // Before the announcement: the next payment is projected at the last amount, 0.53.
+    const quiet = { ...market, dividendCalendar: async () => null };
+    expect(await refresh.refreshIncome({ market: quiet, now })).toBe('');
+    // Announced: next ex-date 2026-12-01, forward rate 1.60 a year → 0.40 a quarter.
+    const cut = { ...market, dividendCalendar: async () => ({ exDate: '2026-12-01', payDate: '2026-12-15', annualRate: 1.6 }) };
+    const alert = await refresh.refreshIncome({ market: cut, now });
+    expect(alert).toContain('KO');
+    expect(alert).toContain('0.4000');
+    expect(alert).toContain('-24.5 %');
+    // Already announced: not repeated on the next nightly refresh.
+    expect(await refresh.refreshIncome({ market: cut, now })).toBe('');
+  });
+});

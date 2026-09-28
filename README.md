@@ -346,7 +346,7 @@ Sample exports with made-up holdings are in [`examples/`](examples/): an IBKR Ac
 How it works:
 
 - **Listings.** Each ISIN is looked up on Yahoo and [OpenFIGI](https://www.openfigi.com/) (all exchanges; `OPENFIGI_API_KEY` optional). A symbol named in the export wins; otherwise the listing on an exchange that trades in the holding's currency, and one built from OpenFIGI only after Yahoo confirms it has a price.
-- **Calendar.** Announced dates and amounts come from Yahoo; later payments are projected from each holding's payment rhythm and marked *estimated*. Bond coupons come from terms you enter on the position.
+- **Calendar.** Announced dates and amounts come from Yahoo, with Financial Modeling Prep as a second source when `FMP_API_KEY` is set (its free plan covers US listings; the fresher announcement wins); later payments are projected from each holding's payment rhythm and marked *estimated*. Bond coupons come from terms you enter on the position.
 - **Tax** (estimates, labelled as such). Source withholding by issuer country (US 15 % with a W-8BEN, 30 % without; none for a resident of the issuer's country; IE/LU funds paid gross). Residence tax comes from `src/income/jurisdictions.ts`:
   - **DE**: Abgeltungsteuer 25 % + Soli (+ `church_tax_rate` 0.08/0.09), foreign tax credited up to 15 %, the €1,000/€2,000 allowance split across brokers (`<account>.allowance`), 30 % Teilfreistellung for equity funds.
   - **AT**: KESt 27.5 %, foreign tax credited up to 15 %.
