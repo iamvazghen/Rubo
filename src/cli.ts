@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { Container, Spacer, Text, TUI } from '@mariozechner/pi-tui';
 import { RuboTerminal } from './terminal.js';
 import { FINANCE_COMMANDS, runFinanceCommand } from './commands/finance.js';
+import { autoSync } from './utils/vps-sync.js';
 import type {
   ApprovalDecision,
   ToolEndEvent,
@@ -403,7 +404,10 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
     },
   );
   // Every completed turn is saved, including follow-ups for messages typed while it was busy.
-  agentRunner.onTurn = (query, answer) => sessionStore?.appendTurn(query, answer);
+  agentRunner.onTurn = async (query, answer) => {
+    await sessionStore?.appendTurn(query, answer);
+    void autoSync('push').then(showSync);
+  };
 
   const intro = new IntroComponent(
     modelSelection.model,
@@ -577,6 +581,13 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
   let slashActive = false;
 
 
+  // Sync results are shown only when something moved or it failed.
+  const showSync = (note: string | null) => {
+    if (!note || / 0 down, 0 up$/.test(note)) return;
+    chatLog.addChild(new Text(theme.muted(`⇅ ${note}`), 0, 0));
+    tui.requestRender();
+  };
+
   // A fresh session, like Telegram's /new: empty screen and model context, new id.
   // The previous session stays saved and resumable.
   const startFresh = () => {
@@ -634,6 +645,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       chatLog.addChild(new Spacer(1));
       chatLog.addChild(new Text(reply ?? '', 0, 0));
       tui.requestRender();
+      void autoSync('push').then(showSync); // holdings and settings the server's reminders read
       return;
     }
     switch (command) {
@@ -698,6 +710,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       }
       case 'sessions': {
         // Interactive picker of saved sessions; selecting one resumes it.
+        showSync(await autoSync('pull'));
         const sessions = await listSessions();
         if (sessions.length === 0) {
           chatLog.addChild(new Spacer(1));
@@ -715,6 +728,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       case 'resume': {
         // `/resume <id>` continues that session (from the CLI or from Telegram);
         // bare `/resume` continues the most recent prior conversation.
+        showSync(await autoSync('pull'));
         if (rest) {
           const full = await loadSession(rest);
           if (full) resumeInto(full);
@@ -1508,6 +1522,11 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
   for (const msg of inputHistory.getMessages().reverse()) {
     editor.addToHistoryWithTruncation(msg);
   }
+
+  // With RUBO_VPS set, bring the server's sessions and holdings down first, so
+  // Telegram conversations can be resumed here; otherwise sync in the background.
+  if (resumeRequest.resume) showSync(await autoSync('pull'));
+  else void autoSync('both').then(showSync);
 
   // Resume a prior session at startup if requested via `rubo --resume [id]`.
   if (resumeRequest.resume) {

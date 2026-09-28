@@ -312,7 +312,7 @@ telegram:2026-09-28_18-40-03
 | Telegram | `/sessions` | List saved sessions from both surfaces |
 | Telegram | `/resume <id>`, `/new`, `/session` | Continue one, start a new one, show the current one |
 
-Telegram sessions are saved on the machine that runs the gateway (the VPS). `rubo pull` copies them down so the CLI can resume them; `rubo push` sends CLI sessions up so Telegram can.
+Telegram sessions are saved on the machine that runs the gateway (your server), CLI sessions on your computer. With `RUBO_VPS=user@host` set, the CLI keeps both in step by itself: it syncs when it starts, before `/sessions` and `/resume`, and after every answer or finance command. Sessions, holdings, income plan, tax settings and targets take part; per file, the newer copy wins, and a session continued on both sides keeps the turns from both. Set `RUBO_AUTOSYNC=0` to turn it off. `rubo pull` / `rubo push` still copy everything by hand, including memory and scores.
 
 ### Holdings, income and rebalancing
 
@@ -355,7 +355,7 @@ How it works:
 - **Rebalancing.** New cash and the reinvested part of income due in 30 days go to underweights first; only then are overweights sold, with the tax on the gain estimated. A quarterly job alerts only when something leaves its band. Rubo never places trades.
 - **Jev** (optional). Probabilities for questions that are judgement, not arithmetic: will this dividend be cut, does the thesis still hold, does this news matter. See [Jev judgement layer](#jev-judgement-layer).
 
-The gateway sends the reminders, so the VPS must know your holdings: import through Telegram, or import in the CLI and run `rubo push`. `rubo pull` brings the VPS state back down. The launcher finds its checkout from its own location (or `RUBO_REPO`); `pull`, `push`, `vps` and `logs` need `RUBO_VPS=user@host`, and `RUBO_VPS_HOME` / `RUBO_VPS_UNIT` if your server does not use `~/.rubo` and `rubo-gateway`.
+The gateway sends the reminders, so the server must know your holdings: import through Telegram, or import in the CLI (synced automatically with `RUBO_VPS` set, otherwise run `rubo push`). The launcher finds its checkout from its own location (or `RUBO_REPO`); `pull`, `push`, `vps` and `logs` need `RUBO_VPS=user@host`, and `RUBO_VPS_HOME` / `RUBO_VPS_UNIT` if your server does not use `~/.rubo` and `rubo-gateway`.
 
 The CLI launches a TUI with a banner, status bar (model · tokens · cost · iter · t/s), command palette (`Ctrl+P`), watchlist sidebar, and input area. Slash commands are auto-completed.
 

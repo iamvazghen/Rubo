@@ -136,8 +136,22 @@ export class SessionStore {
     this.session.model = model;
   }
 
-  /** Append a completed turn and persist. The first turn sets the title. */
+  /**
+   * Append a completed turn and persist. The first turn sets the title.
+   * Turns another surface added to the same session since it was loaded (the
+   * copy on disk came from a sync) are kept, not overwritten.
+   */
   async appendTurn(query: string, answer: string): Promise<void> {
+    const disk = await loadSession(this.session.id).catch(() => null);
+    if (disk && disk.id === this.session.id) {
+      const key = (t: SessionTurn) => `${t.at}\u0000${t.query}`;
+      const known = new Set(this.session.turns.map(key));
+      const extra = disk.turns.filter((t) => !known.has(key(t)));
+      if (extra.length) {
+        this.session.turns = [...this.session.turns, ...extra].sort((a, b) => a.at.localeCompare(b.at));
+        this.session.title = disk.title;
+      }
+    }
     if (this.session.turns.length === 0) {
       this.session.title = deriveTitle(query);
     }
