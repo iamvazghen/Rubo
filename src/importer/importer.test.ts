@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { MarketData } from '../market/yahoo.js';
@@ -35,7 +35,7 @@ const market: MarketData = {
   quote: async () => null,
   dividendHistory: async () => null,
   dividendCalendar: async () => null,
-  usdPerUnit: async () => 1,
+  rate: async () => 1,
   fundamentals: async () => null,
   searchIsin: async (isin) => ({
     US1912161007: [{ symbol: 'KO', exchange: 'NYQ', quoteType: 'EQUITY' }],
@@ -87,5 +87,47 @@ describe('broker exports', () => {
 
     const again = await previewImport(TR_TRANSACTIONS, 'traderepublic', market);
     expect(again.changes.every((c) => c.kind === 'unchanged')).toBe(true);
+  });
+});
+
+describe('the sample files in examples/', () => {
+  const read = (f: string) => readFileSync(join(import.meta.dir, '../../examples', f), 'utf8');
+
+  test('IBKR statement: five US holdings with ISINs, cash left out', () => {
+    const r = parseBrokerExport(read('ibkr-activity-statement.csv'));
+    expect(r.holdings.map((h) => h.symbol)).toEqual(['KO', 'JNJ', 'O', 'MSFT', 'VT']);
+    expect(r.holdings.find((h) => h.symbol === 'VT')).toMatchObject({ isin: 'US9220427424', asset_type: 'etf', shares: 40 });
+  });
+
+  test('Trade Republic transactions: buys, savings plans and a sale become holdings; dividends are skipped', () => {
+    const r = parseBrokerExport(read('traderepublic-transactions.csv'));
+    const dte = r.holdings.find((h) => h.isin === 'DE0005557508')!;
+    expect(dte.shares).toBe(45);
+    expect(dte.avg_cost).toBeCloseTo(29.1, 4); // a sale does not change the average
+    expect(r.holdings.find((h) => h.isin === 'IE00B8GKDB10')!.shares).toBeCloseTo(31.4711, 4);
+    expect(r.holdings).toHaveLength(5);
+  });
+
+  test('generic holdings table in several currencies', () => {
+    const r = parseBrokerExport(read('holdings-generic.csv'));
+    expect(r.holdings.map((h) => [h.symbol, h.currency, h.asset_type])).toEqual([
+      ['NESN.SW', 'CHF', 'stock'], ['ASML.AS', 'EUR', 'stock'], ['ULVR.L', 'GBp', 'stock'], ['VGWL.DE', 'EUR', 'etf'],
+    ]);
+  });
+
+  test('London pence stay pence, not pounds', async () => {
+    const { previewImport } = await import('./apply.js');
+    const p = await previewImport(read('holdings-generic.csv'), 'degiro', market);
+    expect(p.changes.find((c) => c.position.ticker === 'ULVR.L')!.position.currency).toBe('GBp');
+  });
+
+  test('the account is named by the owner or recognised, never assumed', async () => {
+    const { detectAccount } = await import('../commands/finance.js');
+    expect(detectAccount('', 'ibkr-activity-statement.csv', '')).toBe('ibkr');
+    expect(detectAccount('', 'export.csv', read('ibkr-activity-statement.csv'))).toBe('ibkr');
+    expect(detectAccount('my Trade Republic export', 'x.csv', '')).toBe('traderepublic');
+    expect(detectAccount('degiro', 'holdings-generic.csv', '')).toBe('degiro');
+    expect(detectAccount('', 'holdings-generic.csv', '')).toBe('default'); // "holdings" is not ING
+    expect(detectAccount('pension', 'x.csv', '')).toBe('pension');
   });
 });

@@ -39,8 +39,8 @@ export interface MarketData {
   quote(symbol: string): Promise<Quote | null>;
   dividendHistory(symbol: string): Promise<DividendHistory | null>;
   dividendCalendar(symbol: string): Promise<DividendCalendar | null>;
-  /** USD per one unit of `currency`. */
-  usdPerUnit(currency: string): Promise<number | null>;
+  /** Units of `to` per one unit of `from` (1 when equal). Handles London pence (GBp). */
+  rate(from: string, to: string): Promise<number | null>;
   searchIsin(isin: string): Promise<IsinMatch[]>;
   /** Dividend-relevant fundamentals (numbers only; missing ones omitted). */
   fundamentals(symbol: string): Promise<Record<string, number> | null>;
@@ -151,14 +151,16 @@ export const yahoo: MarketData = {
     return out;
   },
 
-  async usdPerUnit(currency) {
-    if (currency === 'USD') return 1;
+  async rate(from, to) {
     // London prices come in pence.
-    if (currency === 'GBp' || currency === 'GBX') {
-      const gbp = await this.usdPerUnit('GBP');
+    if (from === 'GBp' || from === 'GBX') {
+      const gbp = await this.rate('GBP', to);
       return gbp == null ? null : gbp / 100;
     }
-    const q = await this.quote(`${currency.toUpperCase()}USD=X`);
+    const a = from.toUpperCase();
+    const b = to.toUpperCase();
+    if (a === b) return 1;
+    const q = await this.quote(`${a}${b}=X`);
     return q?.price ?? null;
   },
 

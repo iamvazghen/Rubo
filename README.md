@@ -296,7 +296,7 @@ The interactive CLI runs on Node, not Bun: Bun on Windows never reports a termin
 
 ### Sessions
 
-Every conversation is saved and can be continued later, from the CLI or from Telegram. A session id says where it started and when, in local time (`timezone` setting, default Europe/Berlin):
+Every conversation is saved and can be continued later, from the CLI or from Telegram. A session id says where it started and when, in your local time (`/setup timezone`, default: the machine's zone):
 
 ```
 cli:2026-09-28_14-05-12
@@ -314,27 +314,46 @@ Telegram sessions are saved on the machine that runs the gateway (the VPS). `rub
 
 ### Holdings, income and rebalancing
 
-Answered by code, identically in the CLI and on Telegram. Amounts are in USD.
+Answered by code, identically in the CLI and on Telegram. Nothing in it is tied to one person: your country, brokers, currency, holdings, income plan and targets are all settings, so a fork works for anyone. Start with `/setup`, which lists what is set and what is missing:
+
+```
+/setup currency EUR                 # every amount is reported in this (default USD)
+/setup timezone Europe/Paris        # reminder times and session ids
+/import holdings.csv degiro         # any broker; the last word names the account
+/tax set residence FR               # built-in rules: DE, AT
+/tax set flat_rate 30%              # anywhere else: your own flat rate
+/tax set degiro.w8ben yes           # per account: w8ben, domestic, allowance
+/yieldplan set reinvest 70 withdraw 30
+/targets set stock 70 etf 30
+```
+
+Sample exports with made-up holdings are in [`examples/`](examples/): an IBKR Activity Statement, a Trade Republic transaction list and a plain holdings table in four currencies. Import one to try everything without real data.
 
 | Command | What it does |
 |---|---|
-| `/import <file.csv>` (CLI) or send the CSV to the bot | Preview holdings from a **Trade Republic** export (holdings or transactions) or an **IBKR** Activity Statement / Flex query; nothing is saved until `/import confirm` |
+| `/setup [currency X \| timezone Area/City]` | Your settings as a checklist |
+| `/import <file.csv> [account]` (CLI) or send the CSV to the bot | Preview holdings from an **IBKR** Activity Statement, or any holdings or transactions table with ISIN or symbol and quantity columns (Trade Republic, DEGIRO, Scalable, …; English or German headers); nothing is saved until `/import confirm` |
 | `/income [refresh]` | Dividends, distributions and coupons due in the next 90 days, gross and net |
 | `/yieldplan` | Your plan for each payment: reinvest / cash reserve / withdraw / another asset (default 40/30/20/10, per-holding overrides) |
 | `/done <id>` | Record a payment as handled: reserve, allowance used and reinvested shares are updated |
 | `/reserve` | Balance of the down-market cash reserve |
-| `/tax` | Tax residence, filing, church tax, per-broker W-8BEN and Freistellungsauftrag, allowance left |
+| `/tax` | Tax residence, filing, jurisdiction options, per-account W-8BEN / domestic broker / allowance assigned, allowance left |
 | `/targets`, `/rebalance [cash N]` | Target weights and the tax-aware trades that bring holdings back into band |
 
 How it works:
 
 - **Calendar.** Announced dates and amounts come from Yahoo; later payments are projected from each holding's payment rhythm and marked *estimated*. Bond coupons come from terms you enter on the position.
-- **Tax** (estimates, labelled as such). Source withholding by issuer country (US 15 % with a W-8BEN, 30 % without; IE/LU funds paid gross). German residents: Abgeltungsteuer 25 % + Soli (+ church tax 8/9 %), foreign tax credited up to 15 %, the Sparerpauschbetrag and the 30 % Teilfreistellung for equity funds. A German broker withholds at payment; for a foreign broker (IBKR) the German tax is due with the return, so it is set aside before the plan is applied.
-- **Reminders.** A nightly job (06:30 Köln time, on the gateway) refreshes the calendar and schedules two Telegram messages per payment: before the ex-date, and on the pay date with your plan already worked out. The numbers are computed and sent verbatim, never generated.
+- **Tax** (estimates, labelled as such). Source withholding by issuer country (US 15 % with a W-8BEN, 30 % without; none for a resident of the issuer's country; IE/LU funds paid gross). Residence tax comes from `src/income/jurisdictions.ts`:
+  - **DE**: Abgeltungsteuer 25 % + Soli (+ `church_tax_rate` 0.08/0.09), foreign tax credited up to 15 %, the €1,000/€2,000 allowance split across brokers (`<account>.allowance`), 30 % Teilfreistellung for equity funds.
+  - **AT**: KESt 27.5 %, foreign tax credited up to 15 %.
+  - **Anywhere else**: your own `flat_rate`, `allowance`, `credit_cap_rate`, `fund_exemption_pct`, `broker_withholds` via `/tax set`. With no residence set, only withholding is shown, and every figure says so.
+
+  A domestic broker that withholds takes the tax at payment; otherwise it is due with your return and is set aside before your plan is applied. To add a country, add an entry to `jurisdictions.ts` with a test.
+- **Reminders.** A nightly job (06:30 your time, on the gateway) refreshes the calendar and schedules two Telegram messages per payment: before the ex-date, and on the pay date with your plan already worked out. The numbers are computed and sent verbatim, never generated.
 - **Rebalancing.** New cash and the reinvested part of income due in 30 days go to underweights first; only then are overweights sold, with the tax on the gain estimated. A quarterly job alerts only when something leaves its band. Rubo never places trades.
 - **Jev** (with `TYPESAFE_API_KEY`). `dividend_safety`, `thesis_check` and `news_materiality` return probabilities; payment reminders mention a cut risk of 20 % or more. Jev never changes a grade or an amount; every judgement is logged to `.rubo/judgements.jsonl`.
 
-The gateway sends the reminders, so the VPS must know your holdings: import through Telegram, or import in the CLI and run `rubo push`. `rubo pull` brings the VPS state back down.
+The gateway sends the reminders, so the VPS must know your holdings: import through Telegram, or import in the CLI and run `rubo push`. `rubo pull` brings the VPS state back down. The launcher finds its checkout from its own location (or `RUBO_REPO`); `pull`, `push`, `vps` and `logs` need `RUBO_VPS=user@host`, and `RUBO_VPS_HOME` / `RUBO_VPS_UNIT` if your server does not use `~/.rubo` and `rubo-gateway`.
 
 The CLI launches a TUI with a banner, status bar (model · tokens · cost · iter · t/s), command palette (`Ctrl+P`), watchlist sidebar, and input area. Slash commands are auto-completed.
 

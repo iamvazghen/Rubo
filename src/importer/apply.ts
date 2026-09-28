@@ -1,3 +1,4 @@
+import { ensureAccounts } from '../income/store.js';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { yahoo, type IsinMatch, type MarketData } from '../market/yahoo.js';
@@ -32,7 +33,11 @@ const PREFERRED_EXCHANGES: Record<string, string[]> = {
   EUR: ['GER', 'FRA', 'AMS', 'PAR', 'MIL', 'STU', 'MUN'],
   USD: ['NYQ', 'NMS', 'NGM', 'NCM', 'PCX', 'ASE', 'BTS'],
   GBP: ['LSE'],
+  GBp: ['LSE'],
 };
+
+/** ISO code, except London pence (GBp/GBX), which must stay distinct from pounds. */
+const currencyCode = (c: string) => (c === 'GBp' || c.toUpperCase() === 'GBX' ? 'GBp' : c.toUpperCase());
 
 /** Pick the listing to use for market data: an equity/ETF, on an exchange that trades in the holding's currency if possible. */
 export function pickListing(matches: IsinMatch[], currency: string): IsinMatch | undefined {
@@ -62,7 +67,7 @@ async function toPosition(h: ImportedHolding, account: string, market: MarketDat
     data_symbol: dataSymbol,
     shares: h.shares,
     avg_cost: h.avg_cost,
-    currency: h.currency.toUpperCase(),
+    currency: currencyCode(h.currency),
     opened: today,
     thesis: `Imported from ${account} on ${today}`,
     conviction: 'med',
@@ -142,8 +147,11 @@ export function confirmImport(): string {
     return { ...portfolio, positions, journal };
   });
   rmSync(pendingPath());
+  const added = ensureAccounts([p.account]);
   const n = p.changes.filter((c) => c.kind !== 'unchanged').length;
-  return `Imported ${n} change${n === 1 ? '' : 's'} into ${p.account}. /income shows the payments they will bring.`;
+  const lines = [`Imported ${n} change${n === 1 ? '' : 's'} into ${p.account}. /income shows the payments they will bring.`];
+  if (added.length) lines.push(`New account ${added.join(', ')}: check its tax settings with /tax (W-8BEN, whether it withholds your tax).`);
+  return lines.join('\n');
 }
 
 export function cancelImport(): string {

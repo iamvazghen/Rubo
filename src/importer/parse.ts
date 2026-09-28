@@ -1,7 +1,8 @@
 /**
- * Broker exports → normalised holdings. No network, no disk: text in, rows out,
+ * Broker exports → normalised holdings. No network: text in, rows out,
  * so every format is testable from a fixture.
  */
+import { baseCurrency } from '../utils/locale.js';
 
 export interface ImportedHolding {
   isin?: string;
@@ -172,7 +173,7 @@ export function parseGenericTable(rows: string[][], format: string): ParseResult
     if (sign === 0) continue; // dividends, fees, deposits in a transaction list
     const h = byKey.get(id) ?? {
       isin, symbol, name: c.name != null ? r[c.name] : undefined, shares: 0, avg_cost: 0, cost_total: 0,
-      currency: (c.currency != null ? r[c.currency] : '') || 'EUR', asset_type: assetType(isTransactions ? undefined : type),
+      currency: (c.currency != null ? r[c.currency] : '') || baseCurrency(), asset_type: assetType(isTransactions ? undefined : type),
     };
     if (sign > 0) {
       if (!Number.isFinite(price)) warnings.push(`${id}: a buy without a price; average cost may be off`);

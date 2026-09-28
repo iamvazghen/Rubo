@@ -3,13 +3,15 @@ import { PortfolioStore } from '../tools/portfolio/store.js';
 import { formatShares } from './messages.js';
 import { DEFAULT_YIELD_PLAN, describePlan, parsePlanSpec, planFor } from './plan.js';
 import { planEvent, refreshIncome } from './refresh.js';
-import { allowanceLeftEur, incomeStore } from './store.js';
+import { accountId, BROKERS, defaultAccountTax } from './brokers.js';
+import { jurisdictionFor, JURISDICTIONS } from './jurisdictions.js';
+import { allowanceLeft, basePerAllowanceUnit, incomeStore } from './store.js';
+import { baseCurrency, money } from '../utils/locale.js';
 
 /**
  * /income, /yieldplan, /tax, /reserve, /done - shared by the CLI and Telegram so
  * both answer identically. Each returns the text to show.
  */
-const usd = (n: number) => `$${n.toFixed(2)}`;
 
 export const INCOME_COMMANDS = ['income', 'yieldplan', 'tax', 'reserve', 'done'] as const;
 export type IncomeCommand = (typeof INCOME_COMMANDS)[number];
@@ -37,13 +39,13 @@ async function income(args: string, market: MarketData): Promise<string> {
   }
   const byMonth = new Map<string, number>();
   const rows = upcoming.map((e) => {
-    byMonth.set(e.payDate.slice(0, 7), (byMonth.get(e.payDate.slice(0, 7)) ?? 0) + e.tax.net_usd);
+    byMonth.set(e.payDate.slice(0, 7), (byMonth.get(e.payDate.slice(0, 7)) ?? 0) + e.tax.net);
     const flag = e.status === 'estimated' ? ' est.' : '';
-    return `${e.payDate}  ${e.ticker.padEnd(8)} ${usd(e.gross_usd).padStart(9)} gross  ${usd(e.tax.net_usd).padStart(9)} net${flag}   id ${e.id}`;
+    return `${e.payDate}  ${e.ticker.padEnd(8)} ${money(e.gross).padStart(9)} gross  ${money(e.tax.net).padStart(9)} net${flag}   id ${e.id}`;
   });
-  const months = [...byMonth].map(([m, v]) => `${m}: ${usd(v)} net`).join('  ·  ');
+  const months = [...byMonth].map(([m, v]) => `${m}: ${money(v)} net`).join('  ·  ');
   return [
-    'Income, next 90 days (USD):', ...rows, '', months,
+    `Income, next 90 days (${baseCurrency()}):`, ...rows, '', months,
     `Calendar refreshed ${refreshed_at?.slice(0, 16).replace('T', ' ')} UTC · /income refresh to update`,
   ].join('\n');
 }
@@ -87,17 +89,28 @@ function tax(args: string): string {
   const t = incomeStore.tax();
   const [verb = 'show', key, ...rest] = args.trim().split(/\s+/).filter(Boolean);
   const value = rest.join(' ');
+  const yes = /^(yes|true|1|on)$/i.test(value);
   if (verb === 'set' && key) {
-    const acct = /^(\w+)\.(w8ben|domestic|exemption)$/.exec(key);
-    if (key === 'residence') t.residence = value.toUpperCase();
-    else if (key === 'filing' && (value === 'single' || value === 'joint')) t.filing = value;
-    else if (key === 'church') t.church_tax_rate = value === '9' ? 0.09 : value === '8' ? 0.08 : 0;
+    const acct = /^([\w-]+)\.(w8ben|domestic|allowance)$/.exec(key);
+    if (key === 'residence') {
+      t.residence = /^[a-z]{2}$/i.test(value) ? value.toUpperCase() : null;
+      if (value && !t.residence) return 'Residence is a two-letter country code, e.g. /tax set residence DE.';
+      // A known broker is domestic exactly when it is in the new country; unknown ones keep what the owner set.
+      for (const a of Object.values(t.accounts)) if (a.broker && BROKERS[a.broker]) a.domestic = BROKERS[a.broker]!.country === t.residence;
+    } else if (key === 'filing' && (value === 'single' || value === 'joint')) t.filing = value;
     else if (acct) {
-      const [, name, field] = acct;
-      const a = (t.accounts[name!] ??= { domestic: false, w8ben: false, exemption_order_eur: 0 });
-      if (field === 'w8ben') a.w8ben = value === 'yes' || value === 'true';
-      if (field === 'domestic') a.domestic = value === 'yes' || value === 'true';
-      if (field === 'exemption') a.exemption_order_eur = Number(value) || 0;
+      const [, raw, field] = acct;
+      const name = accountId(raw!);
+      const a = (t.accounts[name] ??= defaultAccountTax(name, t.residence));
+      if (field === 'w8ben') a.w8ben = yes;
+      if (field === 'domestic') a.domestic = yes;
+      if (field === 'allowance') a.allowance_assigned = Number(value) || 0;
+    } else if (key === 'clear' && value) delete t.options[value];
+    else if (/^[a-z_]+$/.test(key) && value !== '') {
+      // Jurisdiction options (church_tax_rate) or own rules (flat_rate, allowance, credit_cap_rate, ...).
+      const n = Number(value.replace('%', '')) / (value.endsWith('%') ? 100 : 1);
+      if (!Number.isFinite(n)) return `${key} needs a number.`;
+      t.options[key] = n;
     } else return `Unknown setting "${key}".`;
     t.confirmed_at = new Date().toISOString();
     incomeStore.saveTax(t);
@@ -105,23 +118,34 @@ function tax(args: string): string {
     t.confirmed_at = new Date().toISOString();
     incomeStore.saveTax(t);
   }
+  const j = jurisdictionFor(t.residence, t.options);
   const ledger = incomeStore.ledger();
+  const allowanceMoney = (n: number) => (j && j.currency !== 'BASE' ? money(n, j.currency) : money(n));
+  const options = Object.entries(t.options).map(([k, v]) => `${k} ${v}`).join(', ');
   const lines = [
-    `Tax residence: ${t.residence} · filing ${t.filing} · church tax ${t.church_tax_rate ? `${t.church_tax_rate * 100} %` : 'none'}`,
-    ...Object.entries(t.accounts).map(([name, a]) =>
-      `${name}: ${a.domestic ? 'German broker (withholds tax)' : 'foreign broker (tax via your return)'} · W-8BEN ${a.w8ben ? 'yes' : 'no'}` +
-      `${a.domestic ? ` · Freistellungsauftrag €${a.exemption_order_eur}` : ''} · allowance left €${allowanceLeftEur(t, ledger, name).toFixed(0)}`),
+    `Tax residence: ${t.residence ?? 'not set'}${j ? ` (${j.name})` : ''} · filing ${t.filing}${options ? ` · ${options}` : ''}`,
+    j ? `Annual allowance: ${allowanceMoney(j.allowance(t.filing, t.options))}` :
+      t.residence ? `No built-in rules for ${t.residence}: describe them with /tax set flat_rate 0.25 (and allowance, credit_cap_rate).` :
+      'Only withholding at source is modelled until you /tax set residence XX.',
+    ...Object.entries(t.accounts).map(([name, a]) => {
+      const withholds = Boolean(a.domestic && j?.brokerWithholds);
+      return `${name}${a.broker ? ` (${BROKERS[a.broker]?.name})` : ''}: ${withholds ? 'withholds your tax' : 'tax via your return'} · W-8BEN ${a.w8ben ? 'yes' : 'no'}` +
+        `${withholds && j?.brokerAppliesAllowance ? ` · allowance assigned ${allowanceMoney(a.allowance_assigned)}` : ''}` +
+        `${j ? ` · allowance left ${allowanceMoney(allowanceLeft(t, ledger, name))}` : ''}`;
+    }),
   ];
-  if (!t.confirmed_at) lines.push('', 'These are defaults, not confirmed. Check them, then /tax confirm.');
-  lines.push('', 'Change: /tax set church 8|9|0 · /tax set filing joint · /tax set ibkr.w8ben yes · /tax set traderepublic.exemption 801');
+  if (j && Object.keys(j.optionHelp).length) lines.push(...Object.entries(j.optionHelp).map(([k, v]) => `  ${k}: ${v}`));
+  if (!t.confirmed_at) lines.push('', 'Nothing here is confirmed yet. Set what applies to you, then /tax confirm.');
+  lines.push('', 'Change: /tax set residence DE · /tax set filing joint · /tax set <account>.w8ben yes · /tax set <account>.domestic yes · /tax set <account>.allowance 1000 · /tax set <option> <number> · /tax set clear <option>',
+    `Built-in rules: ${Object.keys(JURISDICTIONS).join(', ')}; anywhere else: /tax set flat_rate <rate>.`);
   return lines.join('\n');
 }
 
 function reserve(): string {
   const l = incomeStore.ledger();
   const moves = l.entries.slice(-5).flatMap((e) =>
-    e.allocations.filter((a) => a.action === 'reserve').map((a) => `  +${usd(a.usd)} from ${e.ticker} (${e.confirmedAt.slice(0, 10)})`));
-  return [`Cash reserve for down markets: ${usd(l.reserve_usd)}`, ...(moves.length ? ['Recent:', ...moves] : [])].join('\n');
+    e.allocations.filter((a) => a.action === 'reserve').map((a) => `  +${money(a.amount)} from ${e.ticker} (${e.confirmedAt.slice(0, 10)})`));
+  return [`Cash reserve for down markets: ${money(l.reserve)}`, ...(moves.length ? ['Recent:', ...moves] : [])].join('\n');
 }
 
 async function done(args: string, market: MarketData): Promise<string> {
@@ -133,15 +157,15 @@ async function done(args: string, market: MarketData): Promise<string> {
 
   const { allocations } = await planEvent(event, market);
   const ledger = incomeStore.ledger();
-  const usdPerEur = (await market.usdPerUnit('EUR')) ?? 1.1;
+  const perUnit = await basePerAllowanceUnit(incomeStore.tax(), market);
   const year = Number(event.payDate.slice(0, 4));
   const account = event.account ?? Object.keys(incomeStore.tax().accounts)[0] ?? 'default';
-  const used = ledger.allowance_used_eur[account];
-  ledger.allowance_used_eur[account] = {
-    year, eur: (used?.year === year ? used.eur : 0) + event.tax.allowance_used_usd / usdPerEur,
+  const used = ledger.allowance_used[account];
+  ledger.allowance_used[account] = {
+    year, amount: (used?.year === year ? used.amount : 0) + event.tax.allowance_used / perUnit,
   };
-  ledger.reserve_usd = Math.round((ledger.reserve_usd + allocations.filter((a) => a.action === 'reserve').reduce((s, a) => s + a.usd, 0)) * 100) / 100;
-  ledger.entries.push({ eventId: event.id, ticker: event.ticker, confirmedAt: new Date().toISOString(), net_usd: event.tax.net_usd, allocations, tax: event.tax });
+  ledger.reserve = Math.round((ledger.reserve + allocations.filter((a) => a.action === 'reserve').reduce((s, a) => s + a.amount, 0)) * 100) / 100;
+  ledger.entries.push({ eventId: event.id, ticker: event.ticker, confirmedAt: new Date().toISOString(), net: event.tax.net, allocations, tax: event.tax });
   incomeStore.saveLedger(ledger);
 
   // Reinvesting into the payer adds the shares; anything else is noted for the owner to buy.
@@ -151,9 +175,9 @@ async function done(args: string, market: MarketData): Promise<string> {
     if (a.action === 'reinvest' && !a.target && a.units) {
       const pos = portfolio.read().positions.find((x) => x.ticker === event.ticker);
       // Average cost is kept in the holding's own currency, so price the new units in it.
-      const usdPerLocal = pos ? await market.usdPerUnit(pos.currency) : null;
-      if (pos && usdPerLocal) {
-        const localPrice = a.unit_price_usd! / usdPerLocal;
+      const basePerLocal = pos ? (pos.currency === baseCurrency() ? 1 : await market.rate(pos.currency, baseCurrency())) : null;
+      if (pos && basePerLocal) {
+        const localPrice = a.unit_price! / basePerLocal;
         const shares = pos.shares + a.units;
         const avgCost = (pos.shares * pos.avg_cost + a.units * localPrice) / shares;
         portfolio.update((p) => ({
@@ -162,15 +186,15 @@ async function done(args: string, market: MarketData): Promise<string> {
         }));
         notes.push(`added ${formatShares(a.units)} ${event.ticker} to your holding (now ${formatShares(shares)})`);
       } else {
-        notes.push(`buy ${formatShares(a.units)} ${event.ticker} for ${usd(a.usd)} (holding not found, so not added)`);
+        notes.push(`buy ${formatShares(a.units)} ${event.ticker} for ${money(a.amount)} (holding not found, so not added)`);
       }
-    } else if ((a.action === 'reinvest' || a.action === 'repurpose') && a.usd > 0) {
-      notes.push(`buy ${a.units ? `${formatShares(a.units)} ` : ''}${a.target ?? event.ticker} for ${usd(a.usd)} (not added until you import or add it)`);
+    } else if ((a.action === 'reinvest' || a.action === 'repurpose') && a.amount > 0) {
+      notes.push(`buy ${a.units ? `${formatShares(a.units)} ` : ''}${a.target ?? event.ticker} for ${money(a.amount)} (not added until you import or add it)`);
     }
   }
   event.status = 'paid';
   incomeStore.saveCalendar(cal.events);
-  return [`Recorded ${event.id}: ${usd(event.tax.net_usd)} net.`, `Reserve now ${usd(ledger.reserve_usd)}.`, ...notes.map((n) => `• ${n}`)].join('\n');
+  return [`Recorded ${event.id}: ${money(event.tax.net)} net.`, `Reserve now ${money(ledger.reserve)}.`, ...notes.map((n) => `• ${n}`)].join('\n');
 }
 
 export { planFor };

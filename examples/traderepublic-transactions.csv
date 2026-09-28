@@ -1,0 +1,12 @@
+Datum;Typ;Wertpapier;ISIN;Anzahl;Kurs;Betrag;Währung
+08.01.2026;Kauf;Allianz SE;DE0008404005;6;282,40;-1.694,40;EUR
+15.01.2026;Kauf;Deutsche Telekom AG;DE0005557508;60;29,10;-1.746,00;EUR
+02.02.2026;Sparplan;Vanguard FTSE All-World High Dividend Yield;IE00B8GKDB10;8,1234;64,20;-521,52;EUR
+02.03.2026;Sparplan;Vanguard FTSE All-World High Dividend Yield;IE00B8GKDB10;7,9651;65,90;-524,90;EUR
+10.03.2026;Kauf;Shell plc;GB00BP6MXD84;40;31,25;-1.250,00;EUR
+01.04.2026;Sparplan;Vanguard FTSE All-World High Dividend Yield;IE00B8GKDB10;7,7722;67,55;-525,01;EUR
+15.04.2026;Dividende;Deutsche Telekom AG;DE0005557508;60;0,90;54,00;EUR
+12.05.2026;Dividende;Allianz SE;DE0008404005;6;15,40;92,40;EUR
+20.05.2026;Verkauf;Deutsche Telekom AG;DE0005557508;15;31,80;477,00;EUR
+02.06.2026;Sparplan;Vanguard FTSE All-World High Dividend Yield;IE00B8GKDB10;7,6104;68,95;-524,74;EUR
+15.07.2026;Kauf;iShares Core MSCI World (Acc);IE00B4L5Y983;12;108,30;-1.299,60;EUR

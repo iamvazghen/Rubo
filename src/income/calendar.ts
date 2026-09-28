@@ -1,7 +1,9 @@
 import type { MarketData } from '../market/yahoo.js';
 import type { Position } from '../tools/portfolio/store.js';
 import type { IncomeEvent, IncomeKind, Ledger } from './store.js';
-import { allowanceLeftEur } from './store.js';
+import { baseCurrency } from '../utils/locale.js';
+import { defaultAccountTax } from './brokers.js';
+import { allowanceLeft, basePerAllowanceUnit } from './store.js';
 import { taxOnPayment, type TaxProfile } from './tax.js';
 
 const DAY = 86_400_000;
@@ -136,34 +138,35 @@ export async function buildIncomeCalendar(p: {
     .flat()
     .sort((a, b) => a.payDate.localeCompare(b.payDate));
 
-  const usdPerEur = (await p.market.usdPerUnit('EUR')) ?? 1.1;
+  const base = baseCurrency();
+  const perUnit = await basePerAllowanceUnit(p.profile, p.market);
   const fx = new Map<string, number>();
-  const used: Record<string, { year: number; eur: number }> = structuredClone(p.ledger.allowance_used_eur);
+  const used: Ledger['allowance_used'] = structuredClone(p.ledger.allowance_used);
   const events: IncomeEvent[] = [];
 
   for (const r of raw) {
-    if (!fx.has(r.currency)) fx.set(r.currency, (await p.market.usdPerUnit(r.currency)) ?? NaN);
+    if (!fx.has(r.currency)) fx.set(r.currency, (await p.market.rate(r.currency, base)) ?? NaN);
     const rate = fx.get(r.currency)!;
     const account = r.account ?? Object.keys(p.profile.accounts)[0] ?? 'default';
-    const acct = p.profile.accounts[account] ?? { domestic: false, w8ben: false, exemption_order_eur: 0 };
+    const acct = p.profile.accounts[account] ?? defaultAccountTax(account, p.profile.residence);
     const year = Number(r.payDate.slice(0, 4));
     const gross = r.shares * r.perShare * rate;
     const tax = taxOnPayment({
-      gross_usd: Number.isFinite(gross) ? gross : 0,
+      gross: Number.isFinite(gross) ? gross : 0,
       isin: r.isin, assetType: r.assetType, partialExemptionPct: r.partialExemptionPct,
       account: acct, profile: p.profile,
-      allowanceLeftEur: allowanceLeftEur(p.profile, { ...p.ledger, allowance_used_eur: used }, account, year),
-      usdPerEur,
+      allowanceLeft: allowanceLeft(p.profile, { ...p.ledger, allowance_used: used }, account, year),
+      basePerAllowanceUnit: perUnit,
     });
-    if (!Number.isFinite(gross)) tax.notes.push(`no ${r.currency}→USD rate, amount unknown`);
-    const prior = used[account]?.year === year ? used[account]!.eur : 0;
-    used[account] = { year, eur: prior + tax.allowance_used_usd / usdPerEur };
+    if (!Number.isFinite(gross)) tax.notes.push(`no ${r.currency}→${base} rate, amount unknown`);
+    const prior = used[account]?.year === year ? used[account]!.amount : 0;
+    used[account] = { year, amount: prior + tax.allowance_used / perUnit };
 
     events.push({
       id: `${r.ticker}:${r.exDate}`, ticker: r.ticker, account: r.account, kind: r.kind,
       exDate: r.exDate, payDate: r.payDate, payDateEstimated: r.payDateEstimated,
       perShare: r.perShare, currency: r.currency, shares: r.shares,
-      gross_usd: Math.round((Number.isFinite(gross) ? gross : 0) * 100) / 100, tax,
+      gross: Math.round((Number.isFinite(gross) ? gross : 0) * 100) / 100, tax,
       status: r.status, source: r.source, previousPerShare: r.previousPerShare,
     });
   }

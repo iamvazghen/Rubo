@@ -4,7 +4,7 @@ import { computeNextRunAtMs } from '../cron/schedule.js';
 import { loadCronStore, saveCronStore } from '../cron/store.js';
 import type { CronJob, CronStore } from '../cron/types.js';
 import { PortfolioStore } from '../tools/portfolio/store.js';
-import { getSetting } from '../utils/config.js';
+import { baseCurrency, timeZone } from '../utils/locale.js';
 import { buildIncomeCalendar } from './calendar.js';
 import { beforeExMessage, cutMessage, payMessage } from './messages.js';
 import { allocate, planFor, type Allocation } from './plan.js';
@@ -15,8 +15,6 @@ import { dividendCutRisk, jevAvailable } from '../judge/jev.js';
 const REMINDER_WINDOW_DAYS = 45;
 const JOB_PREFIX = 'income:';
 const REFRESH_JOB = 'income:refresh';
-
-const timeZone = () => getSetting<string>('timezone', process.env.RUBO_TIMEZONE || 'Europe/Berlin');
 
 /** `day` at `hour`:00 wall-clock time in `tz`, as an ISO instant. */
 export function zonedIso(day: string, hour: number, tz = timeZone()): string {
@@ -35,7 +33,7 @@ export interface PlannedEvent {
   override: boolean;
 }
 
-/** Apply the owner's plan to one payment, pricing reinvest/repurpose targets in USD. */
+/** Apply the owner's plan to one payment, pricing reinvest/repurpose targets in the base currency. */
 export async function planEvent(event: IncomeEvent, market: MarketData): Promise<PlannedEvent> {
   const { parts, override } = planFor(incomeStore.plan(), event.ticker);
   const prices = new Map<string, number>();
@@ -43,10 +41,10 @@ export async function planEvent(event: IncomeEvent, market: MarketData): Promise
     const symbol = part.target ?? (part.action === 'reinvest' ? event.ticker : undefined);
     if (!symbol || prices.has(symbol)) continue;
     const q = await market.quote(symbol);
-    const fx = q ? await market.usdPerUnit(q.currency) : null;
+    const fx = q ? (q.currency === baseCurrency() ? 1 : await market.rate(q.currency, baseCurrency())) : null;
     if (q && fx) prices.set(symbol, q.price * fx);
   }
-  const allocations = allocate(event.tax.net_usd, parts, (target, action) =>
+  const allocations = allocate(event.tax.net, parts, (target, action) =>
     prices.get(target ?? (action === 'reinvest' ? event.ticker : '')),
   );
   return { event, allocations, override };
@@ -100,7 +98,7 @@ export async function refreshIncome(p: { cronStore?: CronStore; market?: MarketD
   const alerts: string[] = [];
   const events: IncomeEvent[] = [...kept];
   const soon = now.getTime() + REMINDER_WINDOW_DAYS * 86_400_000;
-  let reserve = ledger.reserve_usd;
+  let reserve = ledger.reserve;
 
   for (const e of fresh) {
     if (done.has(e.id)) continue;
@@ -117,7 +115,7 @@ export async function refreshIncome(p: { cronStore?: CronStore; market?: MarketD
         if (f) e.cutRisk = (await dividendCutRisk(e.ticker, f)) ?? undefined;
       }
       const planned = await planEvent(e, market);
-      const toReserve = planned.allocations.filter((a) => a.action === 'reserve').reduce((s, a) => s + a.usd, 0);
+      const toReserve = planned.allocations.filter((a) => a.action === 'reserve').reduce((s, a) => s + a.amount, 0);
       reserve += toReserve;
       e.reminderJobs = {
         beforeEx: upsertJob(store, `${JOB_PREFIX}${e.id}:ex`, zonedIso(isoMinusDays(e.exDate, 2), 9), beforeExMessage(e), now.getTime()),

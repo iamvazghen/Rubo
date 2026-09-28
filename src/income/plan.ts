@@ -82,10 +82,11 @@ export function parsePlanSpec(spec: string): PlanPart[] | string {
 }
 
 export interface Allocation extends PlanPart {
-  usd: number;
+  /** Base currency. */
+  amount: number;
   /** reinvest/repurpose into a priced instrument: units to buy (fractional). */
   units?: number;
-  unit_price_usd?: number;
+  unit_price?: number;
 }
 
 /**
@@ -93,21 +94,21 @@ export interface Allocation extends PlanPart {
  * part is rounded down and the leftover cents go to the reserve (or the first
  * part if there is no reserve).
  */
-export function allocate(amountUsd: number, parts: PlanPart[], priceUsd?: (target: string | undefined, action: YieldAction) => number | undefined): Allocation[] {
-  const cents = Math.round(amountUsd * 100);
-  const out: Allocation[] = parts.map((p) => ({ ...p, usd: Math.floor((cents * p.pct) / 100) / 100 }));
-  const assigned = out.reduce((s, a) => s + Math.round(a.usd * 100), 0);
+export function allocate(total: number, parts: PlanPart[], priceOf?: (target: string | undefined, action: YieldAction) => number | undefined): Allocation[] {
+  const cents = Math.round(total * 100);
+  const out: Allocation[] = parts.map((p) => ({ ...p, amount: Math.floor((cents * p.pct) / 100) / 100 }));
+  const assigned = out.reduce((s, a) => s + Math.round(a.amount * 100), 0);
   const leftover = cents - assigned;
   if (leftover > 0) {
     const sink = out.find((a) => a.action === 'reserve') ?? out[0]!;
-    sink.usd = (Math.round(sink.usd * 100) + leftover) / 100;
+    sink.amount = (Math.round(sink.amount * 100) + leftover) / 100;
   }
   for (const a of out) {
     if (a.action !== 'reinvest' && a.action !== 'repurpose') continue;
-    const price = priceUsd?.(a.target, a.action);
+    const price = priceOf?.(a.target, a.action);
     if (price && price > 0) {
-      a.unit_price_usd = price;
-      a.units = Math.floor((a.usd / price) * 10_000) / 10_000;
+      a.unit_price = price;
+      a.units = Math.floor((a.amount / price) * 10_000) / 10_000;
     }
   }
   return out;

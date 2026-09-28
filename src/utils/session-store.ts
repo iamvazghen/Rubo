@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ruboPath } from './paths.js';
-import { getSetting } from './config.js';
+import { timeZone } from './locale.js';
 
 /** Where a session was started. Part of the id, so it is visible wherever the id is. */
 export type SessionOrigin = 'cli' | 'telegram';
@@ -57,16 +57,8 @@ function sessionPath(id: string): string {
   return join(sessionsDir(), `${id.replace(':', '_')}.json`);
 }
 
-/**
- * Local wall-clock time for ids. The gateway runs on a UTC server, so "local" is
- * a setting rather than the machine's clock - otherwise Telegram ids would be
- * two hours off the CLI ones for a user in Köln.
- */
-function timeZone(): string {
-  return getSetting<string>('timezone', process.env.RUBO_TIMEZONE || 'Europe/Berlin');
-}
-
 /** `2026-09-28_14-05-12` in the configured time zone. Sorts chronologically as text. */
+// The gateway runs on a UTC server, so local time is the owner's setting, not the machine clock.
 export function formatSessionStamp(date: Date, tz = timeZone()): string {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {

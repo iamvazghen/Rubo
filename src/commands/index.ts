@@ -41,12 +41,13 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'watchlist', description: 'Show the current watchlist', category: 'Research' },
 
   // --- Portfolio: holdings, income, rebalancing (answered by code, same on Telegram)
-  { name: 'import', description: 'Import holdings from a Trade Republic or IBKR CSV export', category: 'Portfolio', usage: '/import <file.csv> [ibkr|traderepublic] · /import confirm' },
+  { name: 'setup', description: 'Your settings: currency, time zone, tax, accounts, plan, targets', category: 'Portfolio', usage: '/setup currency EUR' },
+  { name: 'import', description: 'Import holdings from a broker CSV export', category: 'Portfolio', usage: '/import <file.csv> [account] · /import confirm' },
   { name: 'income', description: 'Dividends, distributions and coupons due in the next 90 days', category: 'Portfolio', usage: '/income [refresh]' },
   { name: 'yieldplan', description: 'Your plan for income: reinvest, reserve, withdraw, other asset', category: 'Portfolio', usage: '/yieldplan set reinvest 40 reserve 30 withdraw 20 repurpose 10 VWCE' },
   { name: 'done', description: 'Record a payment as handled according to your plan', category: 'Portfolio', usage: '/done KO:2026-09-15' },
   { name: 'reserve', description: 'Balance of the cash reserve for down markets', category: 'Portfolio' },
-  { name: 'tax', description: 'Tax residence, brokers, W-8BEN, church tax, allowance left', category: 'Portfolio', usage: '/tax set church 8' },
+  { name: 'tax', description: 'Tax residence, per-account W-8BEN and withholding, allowance left', category: 'Portfolio', usage: '/tax set residence DE' },
   { name: 'targets', description: 'Target weights for rebalancing', category: 'Portfolio', usage: '/targets set stock 50 etf 40 cash 10' },
   { name: 'rebalance', description: 'How far holdings drifted and the trades that fix it', category: 'Portfolio', usage: '/rebalance [cash 1000]' },
 

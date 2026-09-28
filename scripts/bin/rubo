@@ -7,18 +7,28 @@
 # is right there on PATH.
 set -euo pipefail
 
-: "${RUBO_REPO:=/c/Users/iamva/dexter}"
-: "${RUBO_VPS:=openclaw@100.107.141.83}"
-# The VPS still runs the pre-rename names (unit antoine-gateway, state ~/.antoine).
-# Point these at the new names once the server itself has been migrated.
-: "${RUBO_VPS_HOME:=~/.antoine}"
-: "${RUBO_VPS_UNIT:=antoine-gateway}"
+# Settings (environment variables):
+#   RUBO_REPO      the checkout; default: two levels above this script, if it is one
+#   RUBO_VPS       user@host running the gateway; needed only for pull/push/vps/logs
+#   RUBO_VPS_HOME  state directory there (default ~/.rubo)
+#   RUBO_VPS_UNIT  systemd user unit there (default rubo-gateway)
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd || true)"
+if [ -z "${RUBO_REPO:-}" ] && [ -f "$here/src/index.tsx" ]; then RUBO_REPO="$here"; fi
+: "${RUBO_VPS_HOME:=~/.rubo}"
+: "${RUBO_VPS_UNIT:=rubo-gateway}"
 
-if [ ! -f "$RUBO_REPO/package.json" ]; then
-  echo "[rubo] No checkout at $RUBO_REPO" >&2
-  echo "[rubo] Set RUBO_REPO to the repository path and try again." >&2
+if [ ! -f "${RUBO_REPO:-}/src/index.tsx" ]; then
+  echo "[rubo] No Rubo checkout found. Set RUBO_REPO to it, e.g.: export RUBO_REPO=~/rubo" >&2
   exit 1
 fi
+case "${1:-}" in
+  pull|push|vps|logs)
+    if [ -z "${RUBO_VPS:-}" ]; then
+      echo "[rubo] \"$1\" talks to your server. Set RUBO_VPS first, e.g.: export RUBO_VPS=user@your-server" >&2
+      exit 1
+    fi
+    ;;
+esac
 
 # Pin state to the checkout so memory, portfolio, scores and cron jobs are the
 # same set regardless of the directory this was launched from.

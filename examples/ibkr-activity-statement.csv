@@ -1,0 +1,22 @@
+Statement,Header,Field Name,Field Value
+Statement,Data,BrokerName,Interactive Brokers LLC
+Statement,Data,Title,Activity Statement
+Statement,Data,Period,"January 1, 2026 - September 25, 2026"
+Account Information,Header,Field Name,Field Value
+Account Information,Data,Name,Sample Investor
+Account Information,Data,Account,U0000000
+Account Information,Data,Base Currency,USD
+Open Positions,Header,DataDiscriminator,Asset Category,Currency,Symbol,Quantity,Mult,Cost Price,Cost Basis,Close Price,Value,Unrealized P/L,Code
+Open Positions,Data,Summary,Stocks,USD,KO,120,1,58.40,7008,70.10,8412,1404,
+Open Positions,Data,Summary,Stocks,USD,JNJ,25,1,152.30,3807.5,165.20,4130,322.5,
+Open Positions,Data,Summary,Stocks,USD,O,80,1,54.10,4328,57.60,4608,280,
+Open Positions,Data,Summary,Stocks,USD,MSFT,10,1,395.00,3950,430.00,4300,350,
+Open Positions,Data,Summary,Stocks,USD,VT,40,1,108.75,4350,125.30,5012,662,
+Open Positions,Total,,Stocks,USD,,,,,23443.5,,26462,3018.5,
+Open Positions,Data,Summary,Forex,USD,USD,1500,1,1,1500,1,1500,0,
+Financial Instrument Information,Header,Asset Category,Symbol,Description,Conid,Security ID,Underlying,Listing Exch,Multiplier,Type,Code
+Financial Instrument Information,Data,Stocks,KO,COCA-COLA CO/THE,8894,US1912161007,KO,NYSE,1,COMMON,
+Financial Instrument Information,Data,Stocks,JNJ,JOHNSON & JOHNSON,8719,US4781601046,JNJ,NYSE,1,COMMON,
+Financial Instrument Information,Data,Stocks,O,REALTY INCOME CORP,13153,US7561091049,O,NYSE,1,REIT,
+Financial Instrument Information,Data,Stocks,MSFT,MICROSOFT CORP,272093,US5949181045,MSFT,NASDAQ,1,COMMON,
+Financial Instrument Information,Data,Stocks,VT,VANGUARD TOT WORLD STK ETF,52197301,US9220427424,VT,ARCA,1,ETF,

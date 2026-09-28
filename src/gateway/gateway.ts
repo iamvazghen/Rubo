@@ -33,7 +33,7 @@ function elide(text: string, maxLen: number): string {
   return text.slice(0, maxLen - 3) + '...';
 }
 
-async function handleTelegramInbound(
+export async function handleTelegramInbound(
   cfg: GatewayConfig,
   inbound: TelegramInboundMessage,
 ): Promise<void> {
@@ -88,7 +88,7 @@ async function handleTelegramInbound(
       ? await inbound.document.readText()
           .then((text) => importFromText(text, inbound.document!.fileName, inbound.body))
           .catch((err: unknown) => `Could not read the file: ${err instanceof Error ? err.message : String(err)}`)
-      : 'Send a broker export as a .csv file (Trade Republic or IBKR).';
+      : 'Send a broker export as a .csv file.';
     await inbound.reply(reply);
     return;
   }

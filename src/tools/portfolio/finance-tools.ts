@@ -33,10 +33,10 @@ export const yieldPlanTool = new DynamicStructuredTool({
 export const taxProfileTool = new DynamicStructuredTool({
   name: 'tax_profile',
   description:
-    "The owner's tax residence, filing status, church tax and per-broker W-8BEN / Freistellungsauftrag, plus allowance left. Use before quoting after-tax income. Setting values is a durable change: confirm first.",
+    "The owner's tax residence, filing status, jurisdiction options and per-account settings (W-8BEN, domestic broker, allowance assigned), plus allowance left. Use before quoting after-tax income. Setting values is a durable change: confirm first.",
   schema: z.object({
     action: z.enum(['show', 'set']),
-    key: z.string().optional().describe('residence | filing | church | <account>.w8ben | <account>.domestic | <account>.exemption'),
+    key: z.string().optional().describe('residence (2-letter code) | filing | <account>.w8ben | <account>.domestic | <account>.allowance | an option such as church_tax_rate or flat_rate | clear'),
     value: z.string().optional(),
   }),
   func: ({ action, key, value }) => run('tax', action === 'set' ? `set ${key ?? ''} ${value ?? ''}` : ''),
@@ -54,8 +54,8 @@ export const rebalanceProposal = new DynamicStructuredTool({
   name: 'rebalance_proposal',
   description:
     'Drift of holdings from the target weights and the trades that would fix it (new cash first, then tax-aware sales). Suggestions only; Rubo never trades.',
-  schema: z.object({ new_cash_usd: z.number().optional().describe('Cash the owner will add.') }),
-  func: ({ new_cash_usd }) => run('rebalance', new_cash_usd ? `cash ${new_cash_usd}` : ''),
+  schema: z.object({ new_cash: z.number().optional().describe('Cash the owner will add, in the base currency.') }),
+  func: ({ new_cash }) => run('rebalance', new_cash ? `cash ${new_cash}` : ''),
 });
 
 export const rebalanceTargets = new DynamicStructuredTool({
@@ -68,10 +68,10 @@ export const rebalanceTargets = new DynamicStructuredTool({
 export const portfolioImport = new DynamicStructuredTool({
   name: 'portfolio_import',
   description:
-    'Preview importing holdings from a Trade Republic or IBKR CSV at a local path (nothing is saved), or apply the waiting preview with confirm=true after the owner agreed.',
+    'Preview importing holdings from a broker CSV (IBKR statement, or any holdings/transactions table) at a local path (nothing is saved), or apply the waiting preview with confirm=true after the owner agreed.',
   schema: z.object({
     path: z.string().optional().describe('Path to the CSV (for a preview).'),
-    broker: z.enum(['ibkr', 'traderepublic']).optional(),
+    broker: z.string().optional().describe('Account name, e.g. ibkr, degiro, traderepublic (detected when omitted).'),
     confirm: z.boolean().optional(),
   }),
   func: ({ path, broker, confirm }) => run('import', confirm ? 'confirm' : `${path ?? ''} ${broker ?? ''}`),
