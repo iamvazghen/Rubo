@@ -1,8 +1,8 @@
-import { readFile } from 'node:fs/promises';
 import { Container, Spacer, Text, TUI } from '@mariozechner/pi-tui';
 import { RuboTerminal } from './terminal.js';
 import { FINANCE_COMMANDS, runFinanceCommand } from './commands/finance.js';
 import { autoSync } from './utils/vps-sync.js';
+import { cacheLines, costLines, historyLines, providersLines, rulesLines, thinkingLines, watchlistLines } from './commands/info.js';
 import type {
   ApprovalDecision,
   ToolEndEvent,
@@ -15,9 +15,7 @@ import {
   getProviderDisplayName,
   getSearchProviderDisplayName,
 } from './utils/env.js';
-import { ruboPath } from './utils/paths.js';
 import { HelpPanelComponent } from './components/help-panel.js';
-import { getModelCapabilities } from './model/capabilities.js';
 import { defaultQueue } from './utils/message-queue.js';
 import { logger } from './utils/logger.js';
 import {
@@ -62,8 +60,8 @@ import {
   type SessionSummary,
 } from './utils/session-store.js';
 import { estimateCost, formatUsd } from './utils/cost.js';
-import { getActiveProviderNames, getAllProviderNames } from './tools/finance/providers/index.js';
-import { getActiveNewsProviderNames, getAllNewsProviderNames } from './tools/news/index.js';
+import { getActiveProviderNames } from './tools/finance/providers/index.js';
+import { getActiveNewsProviderNames } from './tools/news/index.js';
 import { PROVIDERS, getProviderById } from './providers.js';
 import { PROVIDERS as MODEL_PROVIDERS, getModelsForProvider } from './utils/model.js';
 
@@ -636,6 +634,13 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
     tui.requestRender();
   };
 
+  /** Print lines from a report-only command (src/commands/info.ts) as a block. */
+  const print = (lines: string[]) => {
+    chatLog.addChild(new Spacer(1));
+    for (const line of lines) chatLog.addChild(line ? new Text(line, 0, 0) : new Spacer(1));
+    tui.requestRender();
+  };
+
   const handleSlashCommand = async (command: string, rawQuery: string) => {
     // Extract arguments: everything after `/command ` (or just the command if no args).
     const rest = rawQuery.replace(/^\/\S+\s*/, '').trim();
@@ -662,19 +667,9 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
         tui.requestRender();
         break;
       }
-      case 'rules': {
-        try {
-          const rulesContent = await readFile(ruboPath('RULES.md'), 'utf-8');
-          chatLog.addChild(new Spacer(1));
-          chatLog.addChild(new Text(theme.muted('Research Rules:'), 0, 0));
-          chatLog.addChild(new Text(rulesContent, 0, 0));
-        } catch {
-          chatLog.addChild(new Spacer(1));
-          chatLog.addChild(new Text(theme.muted('No research rules set. Use "add a rule <text>" to create one.'), 0, 0));
-        }
-        tui.requestRender();
+      case 'rules':
+        print(await rulesLines());
         break;
-      }
       case 'new':
       case 'clear':
         startFresh();
@@ -692,22 +687,9 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       case 'heartbeat':
         await agentRunner.runQuery('Show me my current heartbeat checklist from .rubo/HEARTBEAT.md');
         break;
-      case 'history': {
-        const messages = modelSelection.inMemoryChatHistory.getMessages();
-        chatLog.addChild(new Spacer(1));
-        if (messages.length === 0) {
-          chatLog.addChild(new Text(theme.muted('No conversation history yet.'), 0, 0));
-        } else {
-          chatLog.addChild(new Text(theme.muted('Recent conversations:'), 0, 0));
-          for (const msg of messages) {
-            const summary = msg.summary ?? msg.answer?.slice(0, 100) ?? '(pending)';
-            chatLog.addChild(new Text(theme.muted(`  ${msg.id + 1}. ${msg.query}`), 0, 0));
-            chatLog.addChild(new Text(theme.muted(`     ${summary}`), 0, 0));
-          }
-        }
-        tui.requestRender();
+      case 'history':
+        print(historyLines(modelSelection.inMemoryChatHistory.getMessages()));
         break;
-      }
       case 'sessions': {
         // Interactive picker of saved sessions; selecting one resumes it.
         showSync(await autoSync('pull'));
@@ -780,71 +762,29 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       }
       case 'thinking': {
         const arg = rest.trim().toLowerCase();
-        const caps = getModelCapabilities(modelSelection.model);
         if (arg === 'on' || arg === 'off') {
           setSetting('showThinking', arg === 'on');
           showThinking = arg === 'on';
         }
-        chatLog.addChild(new Spacer(1));
-        chatLog.addChild(
-          new Text(
-            `  ${theme.muted('Reasoning blocks:')} ${showThinking ? theme.success('shown') : theme.muted('hidden')}`,
-            0,
-            0,
-          ),
-        );
-        chatLog.addChild(
-          new Text(
-            caps.reasoning
-              ? `  ${theme.muted('Current model')} ${theme.primaryLight(modelSelection.model)} ${theme.muted('is a thinking model — it produces reasoning to show.')}`
-              : `  ${theme.muted('Current model')} ${theme.primaryLight(modelSelection.model)} ${theme.muted('does not reason, so no blocks will appear either way.')}`,
-            0,
-            0,
-          ),
-        );
-        chatLog.addChild(new Spacer(1));
-        tui.requestRender();
+        print([...thinkingLines(modelSelection.model, showThinking), '']);
         break;
       }
       case 'palette': {
         openCommandPalette();
         break;
       }
-      case 'providers': {
-        chatLog.addChild(new Spacer(1));
-        chatLog.addChild(new Text(theme.primary('Roadmap data providers'), 0, 0));
-        chatLog.addChild(new Spacer(1));
-        const allNames = new Set([...getAllProviderNames(), ...getAllNewsProviderNames()]);
-        const activeFinance = new Set(getActiveProviderNames());
-        const activeNews = new Set(getActiveNewsProviderNames());
-        for (const name of [...allNames].sort()) {
-          const isActive = activeFinance.has(name) || activeNews.has(name);
-          const marker = isActive ? theme.success('●') : theme.muted('○');
-          const label = isActive ? theme.primary(name) : theme.muted(name);
-          chatLog.addChild(new Text(`  ${marker} ${label}`, 0, 0));
-        }
-        chatLog.addChild(new Spacer(1));
-        const activeCount = activeFinance.size + activeNews.size;
-        chatLog.addChild(
-          new Text(theme.muted(`  ${activeCount} of ${allNames.size} providers active`), 0, 0),
-        );
-        tui.requestRender();
+      case 'providers':
+        print(providersLines());
         break;
-      }
       case 'cost': {
         // /cost [cap N]
         const capMatch = rest.match(/^cap\s+(\d+(?:\.\d+)?)/i);
         if (capMatch) {
-          const cap = Number(capMatch[1]);
-          setSetting('costCapUsd', cap);
-          chatLog.addChild(new Spacer(1));
-          chatLog.addChild(new Text(`${theme.success('⏺')} ${theme.primary(`Cost cap set to ${formatUsd(cap)}`)}`, 0, 0));
+          setSetting('costCapUsd', Number(capMatch[1]));
+          print([`${theme.success('⏺')} ${theme.primary(`Cost cap set to ${formatUsd(Number(capMatch[1]))}`)}`]);
         } else {
-          chatLog.addChild(new Spacer(1));
-          chatLog.addChild(new Text(`${theme.primary('Session cost')} ${formatUsd(sessionCostUsd)} · cap ${formatUsd(costCapUsd)}`, 0, 0));
-          chatLog.addChild(new Text(theme.muted(`  ↓ ${sessionTokensIn} in · ↑ ${sessionTokensOut} out`), 0, 0));
+          print(costLines({ costUsd: sessionCostUsd, capUsd: costCapUsd, tokensIn: sessionTokensIn, tokensOut: sessionTokensOut }));
         }
-        tui.requestRender();
         break;
       }
       case 'watch': {
@@ -880,40 +820,12 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
         tui.requestRender();
         break;
       }
-      case 'watchlist': {
-        chatLog.addChild(new Spacer(1));
-        if (watchedTickers.length === 0) {
-          chatLog.addChild(new Text(theme.muted('No tickers watched. /watch AAPL NVDA'), 0, 0));
-        } else {
-          chatLog.addChild(new Text(theme.primary(`Watchlist (${watchedTickers.length})`), 0, 0));
-          chatLog.addChild(new Text(theme.muted(watchedTickers.join(' · ')), 0, 0));
-        }
-        tui.requestRender();
+      case 'watchlist':
+        print(watchlistLines(watchedTickers));
         break;
-      }
-      case 'cache': {
-        chatLog.addChild(new Spacer(1));
-        const subcommand = (rawQuery.replace(/^\/cache\s*/, '').trim().toLowerCase());
-        if (subcommand === 'clear' || subcommand === 'reset') {
-          const { clearToolCache, getToolCacheStats } = await import('./utils/tool-cache.js');
-          const before = getToolCacheStats();
-          clearToolCache();
-          chatLog.addChild(
-            new Text(theme.success(`⏺ Tool cache cleared (was ${before.size} entries, ${before.totalHits} hits)`), 0, 0),
-          );
-        } else {
-          const { getToolCacheStats } = await import('./utils/tool-cache.js');
-          const stats = getToolCacheStats();
-          chatLog.addChild(
-            new Text(theme.primary(`Tool cache: ${stats.size} / ${stats.maxEntries} entries, ${stats.totalHits} hits`), 0, 0),
-          );
-          chatLog.addChild(
-            new Text(theme.muted('/cache clear — flush all cached tool results (forces fresh network calls).'), 0, 0),
-          );
-        }
-        tui.requestRender();
+      case 'cache':
+        print(cacheLines(rest.toLowerCase()));
         break;
-      }
     }
   };
 
