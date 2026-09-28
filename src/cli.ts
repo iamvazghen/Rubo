@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { Container, Spacer, Text, TUI } from '@mariozechner/pi-tui';
 import { RuboTerminal } from './terminal.js';
+import { FINANCE_COMMANDS, runFinanceCommand } from './commands/finance.js';
 import type {
   ApprovalDecision,
   ToolEndEvent,
@@ -606,6 +607,14 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
   const handleSlashCommand = async (command: string, rawQuery: string) => {
     // Extract arguments: everything after `/command ` (or just the command if no args).
     const rest = rawQuery.replace(/^\/\S+\s*/, '').trim();
+    // Holdings, income and rebalancing: answered by code, identically to Telegram.
+    if ((FINANCE_COMMANDS as readonly string[]).includes(command)) {
+      const reply = await runFinanceCommand(command, rest);
+      chatLog.addChild(new Spacer(1));
+      chatLog.addChild(new Text(reply ?? '', 0, 0));
+      tui.requestRender();
+      return;
+    }
     switch (command) {
       case 'model':
         modelSelection.startSelection();

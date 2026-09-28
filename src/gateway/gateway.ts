@@ -4,6 +4,9 @@ import type { TelegramInboundMessage } from './channels/telegram/index.js';
 import { resolveRoute } from './routing/resolve-route.js';
 import { resolveSessionStorePath, upsertSessionMeta } from './sessions/store.js';
 import { handleSessionCommand, openConversation } from './sessions/conversation.js';
+import { FINANCE_COMMANDS, importFromText, runFinanceCommand } from '../commands/finance.js';
+import { ensureIncomeRefreshJob } from '../income/refresh.js';
+import { ensureRebalanceCheckJob } from '../rebalance/check.js';
 import { loadGatewayConfig, type GatewayConfig } from './config.js';
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from '../model/llm.js';
 import { runAgentForMessage, isSessionRunning, enqueueForSession } from './agent-runner.js';
@@ -76,6 +79,30 @@ async function handleTelegramInbound(
   const commandReply = await handleSessionCommand(inbound.body, conversationCtx);
   if (commandReply !== null) {
     await inbound.reply(commandReply);
+    return;
+  }
+
+  // A broker export sent as a file: preview the import (nothing saved until /import confirm).
+  if (inbound.document) {
+    const reply = /\.(csv|txt)$/i.test(inbound.document.fileName)
+      ? await inbound.document.readText()
+          .then((text) => importFromText(text, inbound.document!.fileName, inbound.body))
+          .catch((err: unknown) => `Could not read the file: ${err instanceof Error ? err.message : String(err)}`)
+      : 'Send a broker export as a .csv file (Trade Republic or IBKR).';
+    await inbound.reply(reply);
+    return;
+  }
+
+  // Holdings, income and rebalancing commands: answered by code, same as the CLI.
+  const finance = /^\/(\w+)(?:@\S+)?(?:\s+(.*))?$/s.exec(inbound.body.trim());
+  if (finance && (FINANCE_COMMANDS as readonly string[]).includes(finance[1]!.toLowerCase())) {
+    const name = finance[1]!.toLowerCase();
+    const args = (finance[2] ?? '').trim();
+    // A file path here would point at the server's disk, not the owner's.
+    const reply = name === 'import' && !/^(confirm|cancel)$/.test(args)
+      ? 'Send the CSV export to this chat as a file; you will get a preview to confirm.'
+      : await runFinanceCommand(name, args);
+    await inbound.reply(reply ?? '');
     return;
   }
 
@@ -188,6 +215,9 @@ export async function startGateway(params: { configPath?: string } = {}): Promis
   }, 8000).unref?.();
 
   ensureHeartbeatCronJob(params.configPath);
+  // Nightly income refresh (reminders) and the quarterly drift check; both no-ops until holdings exist.
+  ensureIncomeRefreshJob();
+  ensureRebalanceCheckJob();
   const cron = startCronRunner({ configPath: params.configPath });
 
   return {

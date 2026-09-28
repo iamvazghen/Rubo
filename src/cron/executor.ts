@@ -127,6 +127,40 @@ export async function executeCronJob(
     return;
   }
 
+  // 2b. Code-only jobs: no model involved, so their text arrives exactly as computed.
+  if (job.payload.direct || job.payload.handler) {
+    let text = job.payload.message;
+    try {
+      if (job.payload.handler) {
+        const { runCronHandler } = await import('./handlers.js');
+        // The live store is passed in: this tick saves it afterwards, so jobs a
+        // handler added through a separately loaded copy would be overwritten.
+        text = await runCronHandler(job.payload.handler, store);
+      }
+      job.state.lastRunAtMs = startedAt;
+      job.state.lastDurationMs = Date.now() - startedAt;
+      job.state.consecutiveErrors = 0;
+      if (text.trim()) {
+        await deliver(session, text.trim());
+        job.state.lastRunStatus = 'ok';
+      } else {
+        job.state.lastRunStatus = 'suppressed';
+      }
+    } catch (err) {
+      handleJobError(job, store, err, startedAt);
+      return;
+    }
+    if (job.fulfillment === 'once') {
+      job.enabled = false;
+      job.state.nextRunAtMs = undefined;
+      job.updatedAtMs = Date.now();
+      saveCronStore(store);
+      return;
+    }
+    scheduleNextRun(job, store);
+    return;
+  }
+
   // 3. Resolve model
   const model = job.payload.model ?? (getSetting('modelId', DEFAULT_MODEL) as string);
   const modelProvider = job.payload.modelProvider ?? (getSetting('provider', DEFAULT_PROVIDER) as string);

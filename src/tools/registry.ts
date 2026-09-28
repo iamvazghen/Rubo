@@ -44,6 +44,9 @@ import { createAskUserQuestion, ASK_USER_QUESTION_DESCRIPTION } from './ask-user
 import { getAllProviderLeaves } from './finance/providers/index.js';
 import { getAllNewsLeaves, getNewsRouterTool } from './news/index.js';
 import { portfolioView, portfolioAdd, portfolioRemove, portfolioJournal, portfolioSetRisk } from './portfolio/index.js';
+import { incomeCalendar, yieldPlanTool, taxProfileTool, incomeConfirm, rebalanceProposal, rebalanceTargets, portfolioImport } from './portfolio/finance-tools.js';
+import { dividendSafety, thesisCheck, newsMateriality } from '../judge/tools.js';
+import { jevAvailable } from '../judge/jev.js';
 import {
   gradeTickerTool,
   GRADE_TICKER_DESCRIPTION,
@@ -427,7 +430,24 @@ export function getToolRegistry(model: string): RegisteredTool[] {
       compactDescription: 'Set the user risk profile (capital, risk budget, max drawdown).',
       concurrencySafe: false,
     },
+    // Income, import and rebalancing: same code as the /commands.
+    { name: 'income_calendar', tool: incomeCalendar, description: 'Dividends, distributions and coupons due in the next 90 days, gross and net in USD, with ids.', compactDescription: 'Upcoming income (dividends/coupons), gross and net.', concurrencySafe: true },
+    { name: 'yield_plan', tool: yieldPlanTool, description: "Show or change the owner's income plan (reinvest/reserve/withdraw/repurpose). Confirm before changing.", compactDescription: 'Show or set the income plan.', concurrencySafe: false },
+    { name: 'tax_profile', tool: taxProfileTool, description: 'Tax residence, brokers, W-8BEN, church tax, allowance left. Confirm before changing.', compactDescription: 'Show or set the tax profile.', concurrencySafe: false },
+    { name: 'income_confirm', tool: incomeConfirm, description: 'Record a payment as handled per plan. Only when the owner says it is done.', compactDescription: 'Mark an income payment as handled.', concurrencySafe: false },
+    { name: 'rebalance_proposal', tool: rebalanceProposal, description: 'Drift from target weights and tax-aware trades to fix it. Suggestions only.', compactDescription: 'Rebalancing drift and suggested trades.', concurrencySafe: true },
+    { name: 'rebalance_targets', tool: rebalanceTargets, description: 'Show or set rebalancing target weights. Confirm before changing.', compactDescription: 'Show or set target weights.', concurrencySafe: false },
+    { name: 'portfolio_import', tool: portfolioImport, description: 'Preview a Trade Republic/IBKR CSV import, or apply it after the owner confirmed.', compactDescription: 'Import holdings from a broker CSV.', concurrencySafe: false },
   );
+
+  // Jev judgements: only with a TypeSafe key.
+  if (jevAvailable()) {
+    tools.push(
+      { name: 'dividend_safety', tool: dividendSafety, description: 'Jev probability of a dividend cut within 12 months. Present as a probability.', compactDescription: 'Dividend cut probability (Jev).', concurrencySafe: true },
+      { name: 'thesis_check', tool: thesisCheck, description: "Jev: is the owner's thesis for a holding still intact given new evidence?", compactDescription: 'Thesis still intact? (Jev).', concurrencySafe: true },
+      { name: 'news_materiality', tool: newsMateriality, description: 'Jev: is a news item material to a held position, and which direction?', compactDescription: 'Is this news material? (Jev).', concurrencySafe: true },
+    );
+  }
 
   return tools;
 }

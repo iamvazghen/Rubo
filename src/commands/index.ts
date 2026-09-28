@@ -6,7 +6,7 @@
  * hand-maintained string, which had already drifted — seven commands existed
  * that /help never mentioned. A test asserts the two can no longer diverge.
  */
-export type CommandCategory = 'Research' | 'Session' | 'Data' | 'Display' | 'Cost';
+export type CommandCategory = 'Research' | 'Portfolio' | 'Session' | 'Data' | 'Display' | 'Cost';
 
 export interface SlashCommand {
   name: string;
@@ -39,6 +39,16 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   },
   { name: 'unwatch', description: 'Remove tickers from the watchlist', category: 'Research', usage: '/unwatch AAPL' },
   { name: 'watchlist', description: 'Show the current watchlist', category: 'Research' },
+
+  // --- Portfolio: holdings, income, rebalancing (answered by code, same on Telegram)
+  { name: 'import', description: 'Import holdings from a Trade Republic or IBKR CSV export', category: 'Portfolio', usage: '/import <file.csv> [ibkr|traderepublic] · /import confirm' },
+  { name: 'income', description: 'Dividends, distributions and coupons due in the next 90 days', category: 'Portfolio', usage: '/income [refresh]' },
+  { name: 'yieldplan', description: 'Your plan for income: reinvest, reserve, withdraw, other asset', category: 'Portfolio', usage: '/yieldplan set reinvest 40 reserve 30 withdraw 20 repurpose 10 VWCE' },
+  { name: 'done', description: 'Record a payment as handled according to your plan', category: 'Portfolio', usage: '/done KO:2026-09-15' },
+  { name: 'reserve', description: 'Balance of the cash reserve for down markets', category: 'Portfolio' },
+  { name: 'tax', description: 'Tax residence, brokers, W-8BEN, church tax, allowance left', category: 'Portfolio', usage: '/tax set church 8' },
+  { name: 'targets', description: 'Target weights for rebalancing', category: 'Portfolio', usage: '/targets set stock 50 etf 40 cash 10' },
+  { name: 'rebalance', description: 'How far holdings drifted and the trades that fix it', category: 'Portfolio', usage: '/rebalance [cash 1000]' },
 
   // --- Session
   { name: 'clear', description: 'Clear the conversation and start fresh', category: 'Session' },
@@ -78,6 +88,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 /** Order used by the help panel. */
 export const CATEGORY_ORDER: CommandCategory[] = [
   'Research',
+  'Portfolio',
   'Session',
   'Data',
   'Display',

@@ -49,6 +49,9 @@ case "${1:-}" in
     # Telegram sessions live on the VPS; copy them so `/resume telegram:...` works here.
     mkdir -p "$RUBO_HOME/sessions"
     scp -q "$RUBO_VPS:$RUBO_VPS_HOME/sessions/*_*.json" "$RUBO_HOME/sessions/" 2>/dev/null || echo "[rubo] no sessions on the VPS yet"
+    # Holdings, income plan, tax profile and targets: the VPS sends the reminders, so it holds the truth.
+    scp -q "$RUBO_VPS:$RUBO_VPS_HOME/portfolio.json" "$RUBO_HOME/" 2>/dev/null || true
+    scp -qr "$RUBO_VPS:$RUBO_VPS_HOME/income" "$RUBO_VPS:$RUBO_VPS_HOME/rebalance" "$RUBO_HOME/" 2>/dev/null || true
     echo "[rubo] done"
     ;;
   push)
@@ -58,6 +61,10 @@ case "${1:-}" in
     # sides since the last sync keeps the copy pushed last.
     ssh "$RUBO_VPS" "mkdir -p $RUBO_VPS_HOME/sessions"
     scp -q "$RUBO_HOME"/sessions/*_*.json "$RUBO_VPS:$RUBO_VPS_HOME/sessions/" 2>/dev/null || echo "[rubo] no local sessions to push"
+    # Holdings and income settings changed here (e.g. /import in the CLI) must reach the VPS for reminders.
+    [ -f "$RUBO_HOME/portfolio.json" ] && scp -q "$RUBO_HOME/portfolio.json" "$RUBO_VPS:$RUBO_VPS_HOME/"
+    for d in income rebalance; do [ -d "$RUBO_HOME/$d" ] && scp -qr "$RUBO_HOME/$d" "$RUBO_VPS:$RUBO_VPS_HOME/"; done
+    true
     echo "[rubo] done - restart the gateway there if it should pick it up now"
     ;;
   vps)

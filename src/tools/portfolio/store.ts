@@ -39,7 +39,32 @@ export interface Position {
   stop_loss?: number;
   /** Optional position sizing rationale. */
   size_rationale?: string;
+
+  // --- Added for broker import, income and rebalancing. All optional: rows
+  // written before these existed read as a stock held in an unnamed account.
+  /** What it is. Drives withholding tax (funds pay gross) and fund tax exemptions. */
+  asset_type?: AssetType;
+  /** ISIN from the broker. Also tells the issuer's country, which sets withholding tax. */
+  isin?: string;
+  /** Instrument name as the broker shows it. */
+  name?: string;
+  /** Where it is held, e.g. "traderepublic" or "ibkr". Tax treatment differs per account. */
+  account?: string;
+  /** Symbol used for market data (Yahoo), when it differs from `ticker`. */
+  data_symbol?: string;
+  /** Bonds only: annual coupon in percent of face value. */
+  coupon_rate_pct?: number;
+  /** Bonds only: coupons per year (1, 2, 4, 12). */
+  coupon_frequency?: number;
+  /** Bonds only: next coupon payment date (YYYY-MM-DD). */
+  next_coupon_date?: string;
+  /** Bonds only: face value held (the coupon is paid on this, not on the price). */
+  face_value?: number;
+  /** Funds only: share of the fund's distributions that is tax-exempt in Germany (Teilfreistellung). Default 30 for ETFs. */
+  partial_exemption_pct?: number;
 }
+
+export type AssetType = 'stock' | 'etf' | 'bond' | 'cash';
 
 export interface ClosedPosition extends Position {
   closed: string;

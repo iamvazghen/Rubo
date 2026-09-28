@@ -30,6 +30,7 @@ type TelegramMessage = {
   date?: number;
   text?: string;
   caption?: string;
+  document?: { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
   reply_to_message?: { from?: TelegramUser };
   entities?: Array<{ type: string; offset: number; length: number }>;
 };
@@ -68,6 +69,24 @@ function senderMatchesAllowlist(
   if (normalized.includes(senderId.toLowerCase())) return true;
   if (username && normalized.includes(username.toLowerCase())) return true;
   return false;
+}
+
+const MAX_DOCUMENT_BYTES = 2_000_000;
+
+/** Lazily downloadable attachment: nothing is fetched unless the handler asks. */
+function telegramDocument(botToken: string, doc: NonNullable<TelegramMessage['document']>) {
+  return {
+    fileName: doc.file_name ?? 'file',
+    size: doc.file_size ?? 0,
+    readText: async (): Promise<string> => {
+      if ((doc.file_size ?? 0) > MAX_DOCUMENT_BYTES) throw new Error('file is larger than 2 MB');
+      const file = await callTelegram<{ file_path?: string }>(botToken, 'getFile', { file_id: doc.file_id });
+      if (!file.file_path) throw new Error('Telegram returned no file path');
+      const res = await fetch(`https://api.telegram.org/file/bot${botToken}/${file.file_path}`, { signal: AbortSignal.timeout(30_000) });
+      if (!res.ok) throw new Error(`download failed (${res.status})`);
+      return await res.text();
+    },
+  };
 }
 
 function extractText(message: TelegramMessage): string {
@@ -132,7 +151,8 @@ export async function monitorTelegramChannel(params: MonitorTelegramParams): Pro
       if (message.from.is_bot) continue;
 
       const body = extractText(message);
-      if (!body) continue;
+      // A file without a caption has no text but is still a message (broker exports).
+      if (!body && !message.document) continue;
 
       const chat = message.chat;
       const isGroup = chat.type === 'group' || chat.type === 'supergroup';
@@ -171,6 +191,7 @@ export async function monitorTelegramChannel(params: MonitorTelegramParams): Pro
         senderName,
         senderUsername,
         body,
+        document: message.document ? telegramDocument(botToken, message.document) : undefined,
         timestamp: message.date ? message.date * 1000 : Date.now(),
         mentionsBot,
         sendTyping: () => sendTypingTelegram({ botToken, chatId: chat.id }),

@@ -15,6 +15,8 @@ export type TelegramInboundMessage = {
   /** Sender @username without the leading @ (when present) */
   senderUsername?: string;
   body: string;
+  /** An attached file (e.g. a broker CSV); downloaded only when `readText` is called. */
+  document?: { fileName: string; size: number; readText: () => Promise<string> };
   timestamp?: number;
   /** True when the inbound message mentions / replies to this bot (groups). */
   mentionsBot: boolean;

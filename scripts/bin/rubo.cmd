@@ -47,6 +47,10 @@ if /i "%~1"=="pull" (
   rem Telegram sessions live on the VPS; copy them so /resume telegram:... works here.
   if not exist "%RUBO_HOME%\sessions" mkdir "%RUBO_HOME%\sessions"
   scp -q "%RUBO_VPS%:%RUBO_VPS_HOME%/sessions/*_*.json" "%RUBO_HOME%\sessions" 2>nul || echo [rubo] no sessions on the VPS yet
+  rem Holdings, income plan, tax profile and targets: the VPS sends the reminders, so it holds the truth.
+  scp -q "%RUBO_VPS%:%RUBO_VPS_HOME%/portfolio.json" "%RUBO_HOME%" 2>nul
+  scp -qr "%RUBO_VPS%:%RUBO_VPS_HOME%/income" "%RUBO_HOME%" 2>nul
+  scp -qr "%RUBO_VPS%:%RUBO_VPS_HOME%/rebalance" "%RUBO_HOME%" 2>nul
   echo [rubo] done
   goto :done
 )
@@ -56,6 +60,10 @@ if /i "%~1"=="push" (
   rem CLI sessions, so Telegram can /resume cli:... - the copy pushed last wins.
   ssh %RUBO_VPS% "mkdir -p %RUBO_VPS_HOME%/sessions"
   for %%f in ("%RUBO_HOME%\sessions\*_*.json") do scp -q "%%f" "%RUBO_VPS%:%RUBO_VPS_HOME%/sessions/"
+  rem Holdings and income settings changed here must reach the VPS for reminders.
+  if exist "%RUBO_HOME%\portfolio.json" scp -q "%RUBO_HOME%\portfolio.json" "%RUBO_VPS%:%RUBO_VPS_HOME%/"
+  if exist "%RUBO_HOME%\income" scp -qr "%RUBO_HOME%\income" "%RUBO_VPS%:%RUBO_VPS_HOME%/"
+  if exist "%RUBO_HOME%ebalance" scp -qr "%RUBO_HOME%ebalance" "%RUBO_VPS%:%RUBO_VPS_HOME%/"
   echo [rubo] done - restart the gateway there if it should pick it up now
   goto :done
 )

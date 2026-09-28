@@ -312,6 +312,30 @@ telegram:2026-09-28_18-40-03
 
 Telegram sessions are saved on the machine that runs the gateway (the VPS). `rubo pull` copies them down so the CLI can resume them; `rubo push` sends CLI sessions up so Telegram can.
 
+### Holdings, income and rebalancing
+
+Answered by code, identically in the CLI and on Telegram. Amounts are in USD.
+
+| Command | What it does |
+|---|---|
+| `/import <file.csv>` (CLI) or send the CSV to the bot | Preview holdings from a **Trade Republic** export (holdings or transactions) or an **IBKR** Activity Statement / Flex query; nothing is saved until `/import confirm` |
+| `/income [refresh]` | Dividends, distributions and coupons due in the next 90 days, gross and net |
+| `/yieldplan` | Your plan for each payment: reinvest / cash reserve / withdraw / another asset (default 40/30/20/10, per-holding overrides) |
+| `/done <id>` | Record a payment as handled: reserve, allowance used and reinvested shares are updated |
+| `/reserve` | Balance of the down-market cash reserve |
+| `/tax` | Tax residence, filing, church tax, per-broker W-8BEN and Freistellungsauftrag, allowance left |
+| `/targets`, `/rebalance [cash N]` | Target weights and the tax-aware trades that bring holdings back into band |
+
+How it works:
+
+- **Calendar.** Announced dates and amounts come from Yahoo; later payments are projected from each holding's payment rhythm and marked *estimated*. Bond coupons come from terms you enter on the position.
+- **Tax** (estimates, labelled as such). Source withholding by issuer country (US 15 % with a W-8BEN, 30 % without; IE/LU funds paid gross). German residents: Abgeltungsteuer 25 % + Soli (+ church tax 8/9 %), foreign tax credited up to 15 %, the Sparerpauschbetrag and the 30 % Teilfreistellung for equity funds. A German broker withholds at payment; for a foreign broker (IBKR) the German tax is due with the return, so it is set aside before the plan is applied.
+- **Reminders.** A nightly job (06:30 Köln time, on the gateway) refreshes the calendar and schedules two Telegram messages per payment: before the ex-date, and on the pay date with your plan already worked out. The numbers are computed and sent verbatim, never generated.
+- **Rebalancing.** New cash and the reinvested part of income due in 30 days go to underweights first; only then are overweights sold, with the tax on the gain estimated. A quarterly job alerts only when something leaves its band. Rubo never places trades.
+- **Jev** (with `TYPESAFE_API_KEY`). `dividend_safety`, `thesis_check` and `news_materiality` return probabilities; payment reminders mention a cut risk of 20 % or more. Jev never changes a grade or an amount; every judgement is logged to `.rubo/judgements.jsonl`.
+
+The gateway sends the reminders, so the VPS must know your holdings: import through Telegram, or import in the CLI and run `rubo push`. `rubo pull` brings the VPS state back down.
+
 The CLI launches a TUI with a banner, status bar (model · tokens · cost · iter · t/s), command palette (`Ctrl+P`), watchlist sidebar, and input area. Slash commands are auto-completed.
 
 ---
