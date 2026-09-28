@@ -41,6 +41,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'watchlist', description: 'Show the current watchlist', category: 'Research' },
 
   // --- Portfolio: holdings, income, rebalancing (answered by code, same on Telegram)
+  { name: 'judgements', description: "How well Jev's dividend-cut probabilities matched what happened", category: 'Portfolio' },
   { name: 'setup', description: 'Your settings: currency, time zone, tax, accounts, plan, targets', category: 'Portfolio', usage: '/setup currency EUR' },
   { name: 'import', description: 'Import holdings from a broker CSV export', category: 'Portfolio', usage: '/import <file.csv> [account] · /import confirm' },
   { name: 'income', description: 'Dividends, distributions and coupons due in the next 90 days', category: 'Portfolio', usage: '/income [refresh]' },

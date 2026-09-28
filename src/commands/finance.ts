@@ -5,6 +5,7 @@ import { cancelImport, confirmImport, describePreview, previewImport } from '../
 import { runRebalanceCommand } from '../rebalance/check.js';
 import { accountId, BROKERS } from '../income/brokers.js';
 import { describePlan } from '../income/plan.js';
+import { describeScores, scoreJudgements } from '../judge/score.js';
 import { convertRecorded, incomeStore } from '../income/store.js';
 import { loadTargets, saveTargets } from '../rebalance/check.js';
 import { PortfolioStore } from '../tools/portfolio/store.js';
@@ -16,7 +17,7 @@ import { yahoo, type MarketData } from '../market/yahoo.js';
  * Money commands answered by code, not the model, identically in the CLI and
  * on Telegram. Returns the reply, or null when `name` is not one of them.
  */
-export const FINANCE_COMMANDS = [...INCOME_COMMANDS, 'import', 'targets', 'rebalance', 'setup'] as const;
+export const FINANCE_COMMANDS = [...INCOME_COMMANDS, 'import', 'targets', 'rebalance', 'setup', 'judgements'] as const;
 
 /**
  * Which account an export belongs to: a broker named in the hint or file name,
@@ -45,6 +46,7 @@ export async function runFinanceCommand(name: string, args: string, market: Mark
   if ((INCOME_COMMANDS as readonly string[]).includes(name)) return runIncomeCommand(name as IncomeCommand, args, market);
   if (name === 'targets' || name === 'rebalance') return runRebalanceCommand(name, args, market);
   if (name === 'setup') return setup(args, market);
+  if (name === 'judgements') return describeScores(await scoreJudgements(market));
   if (name === 'import') {
     const [first = '', ...rest] = args.trim().split(/\s+/);
     if (first === 'confirm') return confirmImport();

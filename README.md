@@ -340,6 +340,7 @@ Sample exports with made-up holdings are in [`examples/`](examples/): an IBKR Ac
 | `/done <id>` | Record a payment as handled: reserve, allowance used and reinvested shares are updated |
 | `/reserve` | Balance of the down-market cash reserve |
 | `/tax` | Tax residence, filing, jurisdiction options, per-account W-8BEN / domestic broker / allowance assigned, allowance left |
+| `/judgements` | How well Jev's dividend-cut probabilities matched what happened ([details](#jev-judgement-layer)) |
 | `/targets`, `/rebalance [cash N]` | Target weights (per holding, asset type, region or sector), band, minimum trade and fees; the tax-aware trades that bring holdings back into band, with the weights before and after |
 
 How it works:
@@ -390,12 +391,16 @@ Authorization: Bearer $TYPESAFE_API_KEY
 | `thesis_check` | Is the thesis for this holding still intact? (`noul`), and does the new evidence strengthen, not change or weaken it? (`choice`) | The stored thesis, opening date, conviction, and the new evidence |
 | `news_materiality` | Would this news plausibly change an investor's decision? (`noul`), and which direction? (`choice`) | The news item and the stored thesis |
 | Income reminders | The `dividend_safety` question, for dividends paid in the next 45 days | As above; the reminder mentions it only at 20 % or more |
+| `run_debate` | Will the thesis hold over its horizon? (`noul`), and which side made the better-supported case: bull, bear or neither? (`choice`) | The four specialists' views and the judge's synthesis (each cut to 4,000 characters); returned as `jev_verdict` next to the synthesis |
+| Monthly thesis check (15th, 09:00 your time) | `thesis_check` for every holding with a real thesis, on the month's results and news the agent gathers | Reports only theses in doubt (intact below 50 % or weakening) and holdings still carrying the import placeholder thesis; silent otherwise |
 
 Example ledger line:
 
 ```json
 {"at":"2026-09-28T16:38:38Z","kind":"dividend_safety","subject":"KO","model":"jev-1.13.0","usage":{"input_tokens":648,"output_tokens":20},"answers":{"cut":{"type":"noul","noul":0.29}}}
 ```
+
+**Is it any good?** `/judgements` scores Jev against what happened. A dividend-cut probability resolves a year after it was given: the payment history says whether the dividend was cut or suspended. The Brier score (mean squared error of the probability; lower is better) is shown next to the score of always guessing the observed base rate. Repeated weekly calls on the same company count once a month. Thesis, news and debate judgements have no automatic outcome, so they are counted, not scored.
 
 A judgement is only as good as its state: a year with an unusually low free cash flow (a one-off tax payment, say) raises the cut probability even for a long-standing payer. Read it together with the fundamentals it was given, which `dividend_safety` returns alongside the probability.
 

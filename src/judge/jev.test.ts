@@ -93,3 +93,37 @@ describe('monthly thesis check job', () => {
     }
   });
 });
+
+describe('scoring Jev against what happened', () => {
+  const div = (d: string, a: number) => ({ exDate: d, amount: a });
+  const history = [div('2024-03-01', 0.5), div('2024-06-01', 0.5), div('2024-09-01', 0.5), div('2024-12-01', 0.5),
+    div('2025-03-01', 0.5), div('2025-06-01', 0.25), div('2025-09-01', 0.25)];
+
+  test('a cut is a lower payment than the last one before the judgement, within a year', async () => {
+    const { dividendCutOutcome } = await import('./score.js');
+    const now = Date.parse('2026-09-28');
+    expect(dividendCutOutcome(history, '2025-01-15T00:00:00Z', now)).toBe(true); // 0.25 in June 2025
+    expect(dividendCutOutcome(history, '2024-02-01T00:00:00Z', now)).toBeNull(); // nothing earlier to compare with
+    expect(dividendCutOutcome(history.slice(0, 5), '2024-05-15T00:00:00Z', now)).toBe(false); // kept at 0.5
+    expect(dividendCutOutcome(history, '2026-01-15T00:00:00Z', now)).toBeNull(); // less than a year ago
+    expect(dividendCutOutcome(history.slice(0, 4), '2024-12-15T00:00:00Z', now)).toBe(true); // nothing paid: suspended
+  });
+
+  test('Brier score against the base rate; weekly repeats of the same call count once a month', async () => {
+    const { scoreJudgements, describeScores } = await import('./score.js');
+    const market = { dividendHistory: async (s: string) => (s === 'CUT' ? { currency: 'USD', instrumentType: 'EQUITY', dividends: history }
+      : { currency: 'USD', instrumentType: 'EQUITY', dividends: history.slice(0, 5) }) } as any;
+    const j = (subject: string, at: string, p: number) => ({ at, kind: 'dividend_safety', subject, answers: { cut: { noul: p } } });
+    const r = await scoreJudgements(market, Date.parse('2026-09-28'), [
+      j('CUT', '2025-01-15T00:00:00Z', 0.8), j('CUT', '2025-01-22T00:00:00Z', 0.8), // same month: one
+      j('KEPT', '2024-05-15T00:00:00Z', 0.1),
+      j('KEPT', '2026-08-01T00:00:00Z', 0.2), // not resolved yet
+      { at: '2026-01-01T00:00:00Z', kind: 'thesis_check', subject: 'KO:x', answers: {} },
+    ]);
+    expect(r.resolved.map((x) => [x.subject, x.cut])).toEqual([['CUT', true], ['KEPT', false]]);
+    expect(r.brier).toBeCloseTo(((0.8 - 1) ** 2 + 0.1 ** 2) / 2, 6); // 0.025
+    expect(r.baseline).toBeCloseTo(0.25, 6);
+    expect(r.pending).toBe(1);
+    expect(describeScores(r)).toContain(': better than naive');
+  });
+});
