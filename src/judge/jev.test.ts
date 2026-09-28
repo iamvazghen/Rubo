@@ -58,3 +58,38 @@ describe('Jev debate verdict', () => {
     }
   });
 });
+
+describe('monthly thesis check job', () => {
+  test('created once with a key, never without one, and it names tools that exist', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { tmpdir } = await import('node:os');
+    const home = mkdtempSync(join(tmpdir(), 'rubo-thesis-'));
+    const saved = { key: process.env.TYPESAFE_API_KEY, home: process.env.RUBO_HOME };
+    process.env.RUBO_HOME = home;
+    try {
+      const { ensureThesisCheckJob, THESIS_JOB, THESIS_JOB_MESSAGE } = await import('./jobs.js');
+      const { loadCronStore } = await import('../cron/store.js');
+      process.env.TYPESAFE_API_KEY = '';
+      ensureThesisCheckJob();
+      expect(loadCronStore().jobs).toHaveLength(0);
+      process.env.TYPESAFE_API_KEY = 'k';
+      ensureThesisCheckJob();
+      ensureThesisCheckJob();
+      const jobs = loadCronStore().jobs.filter((j) => j.name === THESIS_JOB);
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]!.schedule).toMatchObject({ kind: 'cron', expr: '0 9 15 * *' });
+      expect(jobs[0]!.payload.direct).toBeUndefined(); // a model job: it gathers the evidence
+      const { getToolRegistry } = await import('../tools/registry.js');
+      const names = getToolRegistry('gpt-4o').map((t) => t.name);
+      for (const tool of ['portfolio_view', 'thesis_check']) {
+        expect(THESIS_JOB_MESSAGE).toContain(tool);
+        expect(names).toContain(tool);
+      }
+    } finally {
+      if (saved.key) process.env.TYPESAFE_API_KEY = saved.key; else process.env.TYPESAFE_API_KEY = '';
+      if (saved.home) process.env.RUBO_HOME = saved.home; else delete process.env.RUBO_HOME;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});

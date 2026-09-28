@@ -7,6 +7,7 @@ import { handleSessionCommand, openConversation } from './sessions/conversation.
 import { FINANCE_COMMANDS, importFromText, runFinanceCommand } from '../commands/finance.js';
 import { ensureIncomeRefreshJob } from '../income/refresh.js';
 import { ensureRebalanceCheckJob } from '../rebalance/check.js';
+import { ensureThesisCheckJob } from '../judge/jobs.js';
 import { loadGatewayConfig, type GatewayConfig } from './config.js';
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from '../model/llm.js';
 import { runAgentForMessage, isSessionRunning, enqueueForSession } from './agent-runner.js';
@@ -219,6 +220,7 @@ export async function startGateway(params: { configPath?: string } = {}): Promis
   // Nightly income refresh (reminders) and the quarterly drift check; both no-ops until holdings exist.
   ensureIncomeRefreshJob();
   ensureRebalanceCheckJob();
+  ensureThesisCheckJob();
   const cron = startCronRunner({ configPath: params.configPath });
 
   return {
