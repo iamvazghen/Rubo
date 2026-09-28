@@ -34,28 +34,51 @@ const PREFERRED_EXCHANGES: Record<string, string[]> = {
   USD: ['NYQ', 'NMS', 'NGM', 'NCM', 'PCX', 'ASE', 'BTS'],
   GBP: ['LSE'],
   GBp: ['LSE'],
+  CHF: ['EBS'],
 };
 
 /** ISO code, except London pence (GBp/GBX), which must stay distinct from pounds. */
 const currencyCode = (c: string) => (c === 'GBp' || c.toUpperCase() === 'GBX' ? 'GBp' : c.toUpperCase());
 
-/** Pick the listing to use for market data: an equity/ETF, on an exchange that trades in the holding's currency if possible. */
-export function pickListing(matches: IsinMatch[], currency: string): IsinMatch | undefined {
+/**
+ * Listings in the order to try: equities/ETFs, on an exchange that trades in the
+ * holding's currency first (Xetra before Frankfurt, NYSE before the rest), and
+ * Yahoo's own matches before ones built from OpenFIGI at the same rank.
+ */
+export function rankListings(matches: IsinMatch[], currency: string): IsinMatch[] {
   const usable = matches.filter((m) => m.quoteType === 'EQUITY' || m.quoteType === 'ETF');
   const pool = usable.length ? usable : matches;
-  // Walk the preference list in order: Xetra before Frankfurt, NYSE before the rest.
-  for (const exchange of PREFERRED_EXCHANGES[currency] ?? []) {
-    const hit = pool.find((m) => m.exchange === exchange);
-    if (hit) return hit;
+  const prefs = PREFERRED_EXCHANGES[currency] ?? [];
+  const rank = (m: IsinMatch) => {
+    const i = prefs.indexOf(m.exchange);
+    return (i < 0 ? prefs.length : i) * 2 + (m.unverified ? 1 : 0);
+  };
+  return pool.map((m, i) => ({ m, i })).sort((a, b) => rank(a.m) - rank(b.m) || a.i - b.i).map(({ m }) => m);
+}
+
+export function pickListing(matches: IsinMatch[], currency: string): IsinMatch | undefined {
+  return rankListings(matches, currency)[0];
+}
+
+/** The best listing that really trades: unverified candidates must return a Yahoo quote. */
+async function resolveListing(matches: IsinMatch[], currency: string, market: MarketData): Promise<IsinMatch | undefined> {
+  let tries = 0;
+  for (const m of rankListings(matches, currency)) {
+    if (!m.unverified) return m;
+    if (++tries > 6) break;
+    if (await market.quote(m.symbol)) return m;
   }
-  return pool[0];
+  return undefined;
 }
 
 async function toPosition(h: ImportedHolding, account: string, market: MarketData, today: string): Promise<Position | null> {
   let dataSymbol = h.symbol;
   let type = h.asset_type;
   if (h.isin) {
-    const match = pickListing(await market.searchIsin(h.isin), h.currency);
+    const matches = await market.searchIsin(h.isin);
+    // A symbol the export itself names wins when it is one of the listings.
+    const named = h.symbol ? matches.find((m) => m.symbol.toUpperCase() === h.symbol!.toUpperCase()) : undefined;
+    const match = named ?? (await resolveListing(matches, currencyCode(h.currency), market));
     if (match) {
       dataSymbol = match.symbol;
       type ??= match.quoteType === 'ETF' ? 'etf' : 'stock';

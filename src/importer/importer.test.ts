@@ -131,3 +131,36 @@ describe('the sample files in examples/', () => {
     expect(detectAccount('pension', 'x.csv', '')).toBe('pension');
   });
 });
+
+describe('listings from OpenFIGI', () => {
+  test('exchange codes become Yahoo symbols; Frankfurt also offers the Xetra symbol', async () => {
+    const { figiToListings } = await import('../market/openfigi.js');
+    expect(figiToListings([
+      { ticker: 'VGWD', exchCode: 'GR', securityType: 'ETP' },
+      { ticker: 'VHYL', exchCode: 'NA', securityType: 'ETP' },
+      { ticker: 'KO', exchCode: 'UN', securityType: 'Common Stock' },
+      { ticker: 'KOEUR', exchCode: 'E1', securityType: 'Common Stock' }, // not a main venue
+      { ticker: 'BRK/B', exchCode: 'UN', securityType: 'Common Stock' }, // written differently on Yahoo
+    ]).map((m) => [m.symbol, m.exchange, m.quoteType])).toEqual([
+      ['VGWD.F', 'FRA', 'ETF'], ['VGWD.DE', 'GER', 'ETF'], ['VHYL.AS', 'AMS', 'ETF'], ['KO', 'NYQ', 'EQUITY'],
+    ]);
+  });
+
+  test('a EUR holding gets a EUR listing that really trades, not the London one', async () => {
+    const { previewImport } = await import('./apply.js');
+    const quoted = new Set(['VGWD.DE']);
+    const figiMarket: MarketData = {
+      ...market,
+      quote: async (s) => (quoted.has(s) ? { price: 70, currency: 'EUR' } : null),
+      searchIsin: async () => [
+        { symbol: 'VHYD.L', exchange: 'LSE', quoteType: 'ETF' },
+        { symbol: 'VGWD.F', exchange: 'FRA', quoteType: 'ETF', unverified: true },
+        { symbol: 'VGWD.XX', exchange: 'GER', quoteType: 'ETF', unverified: true }, // no quote: skipped
+        { symbol: 'VGWD.DE', exchange: 'GER', quoteType: 'ETF', unverified: true },
+      ],
+    };
+    const csvText = 'ISIN;Anzahl;Kurs;Währung;Typ\nIE00B8GKDB10;10;65,00;EUR;ETF\n';
+    const p = await previewImport(csvText, 'traderepublic', figiMarket);
+    expect(p.changes[0]!.position.data_symbol).toBe('VGWD.DE');
+  });
+});

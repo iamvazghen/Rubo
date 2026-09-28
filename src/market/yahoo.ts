@@ -6,6 +6,7 @@
  * modules that do decide can be tested against fixtures through the
  * `MarketData` interface instead of the network.
  */
+import { openFigiListings } from './openfigi.js';
 
 export interface DividendHistory {
   currency: string;
@@ -33,6 +34,8 @@ export interface IsinMatch {
   symbol: string;
   exchange: string;
   quoteType: string;
+  /** Built from another source (OpenFIGI); confirm with a quote before relying on it. */
+  unverified?: boolean;
 }
 
 export interface MarketData {
@@ -165,11 +168,14 @@ export const yahoo: MarketData = {
   },
 
   async searchIsin(isin) {
-    const json = await getJson(
-      `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(isin)}&quotesCount=8&newsCount=0`,
-    );
-    return ((json?.quotes ?? []) as any[])
+    const [json, figi] = await Promise.all([
+      getJson(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(isin)}&quotesCount=8&newsCount=0`),
+      openFigiListings(isin),
+    ]);
+    const found: IsinMatch[] = ((json?.quotes ?? []) as any[])
       .filter((q) => q.symbol)
       .map((q) => ({ symbol: String(q.symbol), exchange: String(q.exchange ?? ''), quoteType: String(q.quoteType ?? '') }));
+    const known = new Set(found.map((m) => m.symbol));
+    return [...found, ...figi.filter((m) => !known.has(m.symbol))];
   },
 };
