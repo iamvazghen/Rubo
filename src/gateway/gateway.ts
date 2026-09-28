@@ -145,27 +145,28 @@ export async function handleTelegramInbound(
 
     debugLog(`[telegram] running agent for session=${route.sessionKey} conversation=${conversation.id}`);
     const startedAt = Date.now();
-    const reply = await runAgentForMessage({
+    let sent = 0;
+    await runAgentForMessage({
       sessionKey: route.sessionKey,
       query,
       model,
       modelProvider,
       channel: 'telegram',
       groupContext,
+      // Each answer goes out and into the saved session as it completes, including
+      // follow-ups for messages sent while Rubo was still working.
+      onTurn: async (turn) => {
+        if (!turn.answer.trim()) return;
+        await conversation.appendTurn(turn.query, turn.answer.trim());
+        await inbound.reply(turn.answer.trim(), turn.reasoning);
+        sent++;
+        console.log(`Sent telegram reply (${turn.answer.length} chars, ${Date.now() - startedAt}ms)`);
+      },
     });
-    const answer = reply.answer;
-    const reasoning = reply.reasoning;
     const durationMs = Date.now() - startedAt;
 
     stopTypingLoop();
-
-    if (answer.trim()) {
-      await conversation.appendTurn(query, answer.trim());
-      await inbound.reply(answer.trim(), reasoning);
-      console.log(`Sent telegram reply (${answer.length} chars, ${durationMs}ms)`);
-    } else {
-      console.log(`Agent returned empty response (${durationMs}ms)`);
-    }
+    if (sent === 0) console.log(`Agent returned empty response (${durationMs}ms)`);
   } catch (err) {
     stopTypingLoop();
     const msg = err instanceof Error ? err.message : String(err);

@@ -402,6 +402,8 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
       throttledRender();
     },
   );
+  // Every completed turn is saved, including follow-ups for messages typed while it was busy.
+  agentRunner.onTurn = (query, answer) => sessionStore?.appendTurn(query, answer);
 
   const intro = new IntroComponent(
     modelSelection.model,
@@ -1036,7 +1038,6 @@ export async function runCli(argv: string[] = process.argv.slice(2)) {
     const result = await agentRunner.runQuery(query);
     if (result?.answer) {
       await inputHistory.updateAgentResponse(result.answer);
-      await sessionStore?.appendTurn(query, result.answer);
     }
     refreshError();
     tui.requestRender();

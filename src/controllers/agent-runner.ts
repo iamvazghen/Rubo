@@ -146,6 +146,9 @@ export class AgentRunnerController {
     this.emitChange();
   }
 
+  /** Called once per completed turn with the exact text it answered, including messages merged in mid-run. */
+  onTurn?: (query: string, answer: string) => void | Promise<void>;
+
   async runQuery(query: string): Promise<RunQueryResult | undefined> {
     this.abortController = new AbortController();
     let finalAnswer: string | undefined;
@@ -178,12 +181,15 @@ export class AgentRunnerController {
         messageQueue: defaultQueue,
       });
       const stream = agent.run(query, this.inMemoryChatHistory);
+      let answered = query;
       for await (const event of stream) {
         if (event.type === 'done') {
           finalAnswer = (event as DoneEvent).answer;
         }
+        if (event.type === 'queue_drain') answered += `\n\n${event.mergedText}`;
         await this.handleEvent(event);
       }
+      if (finalAnswer) await this.onTurn?.(answered, finalAnswer);
 
       // Post-run: if messages arrived after the agent's last drain, start a new turn
       if (!defaultQueue.isEmpty()) {

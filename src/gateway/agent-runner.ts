@@ -89,6 +89,8 @@ export type AgentRunRequest = {
   maxIterations?: number;
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void | Promise<void>;
+  /** Each completed turn, as soon as it completes (a follow-up for late messages is its own turn). */
+  onTurn?: (turn: { query: string; answer: string; reasoning: string }) => void | Promise<void>;
   isHeartbeat?: boolean;
   /** Run without persistent session history or memory (minimal context, ~95% token savings). */
   isolatedSession?: boolean;
@@ -119,42 +121,45 @@ export async function runAgentForMessage(req: AgentRunRequest): Promise<AgentRep
       messageQueue: session?.queue,
     });
 
-    for await (const event of agent.run(req.query, session?.history)) {
-      await req.onEvent?.(event);
-      if (event.type === 'done') {
-        finalAnswer = event.answer;
-        finalReasoning = event.reasoning ?? '';
-      }
-    }
-
-    // Post-run: drain any messages that arrived after the agent's last check
-    if (session && !session.queue.isEmpty()) {
-      const remaining = session.queue.dequeueAll();
-      const mergedText = remaining.map(m => m.text).join('\n\n');
-      session.history.saveUserQuery(mergedText);
-
-      const followUp = await Agent.create({
-        model: req.model,
-        modelProvider: req.modelProvider,
-        maxIterations: req.maxIterations ?? 10,
-        signal: req.signal,
-        channel: req.channel,
-        groupContext: req.groupContext,
-        memoryEnabled: !isolated,
-        messageQueue: session.queue,
-      });
-
-      for await (const event of followUp.run(mergedText, session.history)) {
+    // One turn per pass: the query, plus anything merged in while it ran. Messages
+    // that arrive after the last merge get their own pass, so none is dropped and
+    // every answer is delivered and saved with the text it answers.
+    let current: typeof agent | null = agent;
+    let query = req.query;
+    while (current) {
+      let answer = '';
+      let reasoning = '';
+      let answered = query;
+      for await (const event of current.run(query, session?.history)) {
         await req.onEvent?.(event);
+        if (event.type === 'queue_drain') answered += `\n\n${event.mergedText}`;
         if (event.type === 'done') {
-          finalAnswer = event.answer;
-          finalReasoning = event.reasoning ?? '';
+          answer = event.answer;
+          reasoning = event.reasoning ?? '';
         }
       }
-    }
+      if (answer && session) await session.history.saveAnswer(answer);
+      if (answer) {
+        finalAnswer = answer;
+        finalReasoning = reasoning;
+        await req.onTurn?.({ query: answered, answer, reasoning });
+      }
 
-    if (finalAnswer && session) {
-      await session.history.saveAnswer(finalAnswer);
+      current = null;
+      if (session && !session.queue.isEmpty()) {
+        query = session.queue.dequeueAll().map((m) => m.text).join('\n\n');
+        session.history.saveUserQuery(query);
+        current = await Agent.create({
+          model: req.model,
+          modelProvider: req.modelProvider,
+          maxIterations: req.maxIterations ?? 10,
+          signal: req.signal,
+          channel: req.channel,
+          groupContext: req.groupContext,
+          memoryEnabled: !isolated,
+          messageQueue: session.queue,
+        });
+      }
     }
 
     // Prune HEARTBEAT_OK turns to avoid context pollution
